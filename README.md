@@ -35,7 +35,7 @@
 │                                                                     │
 │   🎁 CLAIM UBI     Get free daily coins just for being human        │
 │                                                                     │
-│   🗳️  VOTE          Have a say in how SHURIUM evolves                 │
+│   🗳️  VOTE          Have a say in how SHURIUM evolves               │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -236,7 +236,7 @@ Bitcoin mining wastes electricity on meaningless puzzles. SHURIUM miners solve *
      │  ─────────────────────►                          │
      │                                                  │
      │            ┌─────────────────────┐               │
-     │            │   SHURIUM NETWORK     │               │
+     │            │   SHURIUM NETWORK     │             │
      │            │                     │               │
      │            │  ✓ Check balance    │               │
      │            │  ✓ Verify signature │               │

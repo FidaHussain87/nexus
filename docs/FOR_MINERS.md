@@ -15,11 +15,11 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                                                                         │
-│                BITCOIN MINING vs SHURIUM MINING                           │
+│                BITCOIN MINING vs SHURIUM MINING                         │
 │                                                                         │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │                                                                 │   │
-│   │   BITCOIN MINING                   SHURIUM MINING                 │   │
+│   │   BITCOIN MINING                   SHURIUM MINING               │   │
 │   │   ══════════════                   ════════════                 │   │
 │   │                                                                 │   │
 │   │   "Find a random number           "Train this AI model          │   │
@@ -51,7 +51,7 @@ Think of mining like a job marketplace:
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                                                                         │
-│                    THE SHURIUM MARKETPLACE                                │
+│                    THE SHURIUM MARKETPLACE                              │
 │                                                                         │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │                                                                 │   │
@@ -74,7 +74,7 @@ Think of mining like a job marketplace:
 │                                                                         │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │                                                                 │   │
-│   │                    SHURIUM NETWORK                                │   │
+│   │                    SHURIUM NETWORK                              │   │
 │   │                                                                 │   │
 │   │   • Matches problems with miners                                │   │
 │   │   • Verifies solutions are correct                              │   │
@@ -108,7 +108,7 @@ Think of mining like a job marketplace:
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                                                                         │
-│                    PROBLEM TYPES IN SHURIUM                               │
+│                    PROBLEM TYPES IN SHURIUM                             │
 │                                                                         │
 │   🤖 MACHINE LEARNING / AI                                              │
 │   ────────────────────────                                              │
@@ -279,12 +279,12 @@ Think of mining like a job marketplace:
 │   │                                                                 │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
-│   STEP 2: INSTALL SHURIUM                                                 │
+│   STEP 2: INSTALL SHURIUM                                               │
 │   ─────────────────────                                                 │
 │                                                                         │
 │   # Download                                                            │
-│   git clone https://github.com/shurium/shurium.git                          │
-│   cd shurium                                                              │
+│   git clone https://github.com/shurium/shurium.git                      │
+│   cd shurium                                                            │
 │                                                                         │
 │   # Build                                                               │
 │   mkdir build && cd build                                               │
@@ -295,16 +295,16 @@ Think of mining like a job marketplace:
 │   ───────────────────────                                               │
 │                                                                         │
 │   # Start the daemon                                                    │
-│   ./shuriumd --daemon                                                     │
+│   ./shuriumd --daemon                                                   │
 │                                                                         │
 │   # Wait for sync (first time takes a while)                            │
-│   ./shurium-cli getblockchaininfo                                         │
+│   ./shurium-cli getblockchaininfo                                       │
 │                                                                         │
 │   STEP 4: CREATE A WALLET                                               │
 │   ───────────────────────                                               │
 │                                                                         │
 │   # Get a new address for your mining rewards                           │
-│   ./shurium-cli getnewaddress "mining rewards"                            │
+│   ./shurium-cli getnewaddress "mining rewards"                          │
 │                                                                         │
 │   # SAVE THIS ADDRESS! You'll need it.                                  │
 │                                                                         │
@@ -312,12 +312,12 @@ Think of mining like a job marketplace:
 │   ─────────────────────                                                 │
 │                                                                         │
 │   # Enable mining                                                       │
-│   ./shurium-cli setgenerate true                                          │
+│   ./shurium-cli setgenerate true                                        │
 │                                                                         │
 │   # Check mining status                                                 │
-│   ./shurium-cli getmininginfo                                             │
+│   ./shurium-cli getmininginfo                                           │
 │                                                                         │
-│   🎉 YOU'RE NOW MINING SHURIUM!                                           │
+│   🎉 YOU'RE NOW MINING SHURIUM!                                         │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -402,7 +402,7 @@ Think of mining like a job marketplace:
 │                                                                         │
 │                    "HOW DO THEY KNOW I ACTUALLY DID THE WORK?"          │
 │                                                                         │
-│   Great question! Here's how SHURIUM verifies your solutions:             │
+│   Great question! Here's how SHURIUM verifies your solutions:           │
 │                                                                         │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │                                                                 │   │
@@ -464,39 +464,39 @@ Think of mining like a job marketplace:
 │   ─────────────────                                                     │
 │                                                                         │
 │   # Start mining                                                        │
-│   ./shurium-cli setgenerate true                                          │
+│   ./shurium-cli setgenerate true                                        │
 │                                                                         │
 │   # Start mining with specific thread count                             │
-│   ./shurium-cli setgenerate true 4                                        │
+│   ./shurium-cli setgenerate true 4                                      │
 │                                                                         │
 │   # Stop mining                                                         │
-│   ./shurium-cli setgenerate false                                         │
+│   ./shurium-cli setgenerate false                                       │
 │                                                                         │
 │   CHECK STATUS                                                          │
 │   ────────────                                                          │
 │                                                                         │
 │   # See mining info                                                     │
-│   ./shurium-cli getmininginfo                                             │
+│   ./shurium-cli getmininginfo                                           │
 │                                                                         │
 │   # Check current work                                                  │
-│   ./shurium-cli getwork                                                   │
+│   ./shurium-cli getwork                                                 │
 │                                                                         │
 │   # List available problems                                             │
-│   ./shurium-cli listproblems                                              │
+│   ./shurium-cli listproblems                                            │
 │                                                                         │
 │   EARNINGS                                                              │
 │   ────────                                                              │
 │                                                                         │
 │   # Check balance                                                       │
-│   ./shurium-cli getbalance                                                │
+│   ./shurium-cli getbalance                                              │
 │                                                                         │
 │   # List recent mining rewards                                          │
-│   ./shurium-cli listtransactions "*" 20                                   │
+│   ./shurium-cli listtransactions "*" 20                                 │
 │                                                                         │
 │   CONFIGURATION                                                         │
 │   ─────────────                                                         │
 │                                                                         │
-│   Edit ~/.shurium/shurium.conf:                                             │
+│   Edit ~/.shurium/shurium.conf:                                         │
 │                                                                         │
 │   # Mining settings                                                     │
 │   gen=1                        # Enable mining                          │
@@ -550,7 +550,7 @@ Think of mining like a job marketplace:
 │                                                                         │
 │   Solutions:                                                            │
 │   • Install CUDA toolkit (NVIDIA)                                       │
-│   • Set usegpu=1 in shurium.conf                                          │
+│   • Set usegpu=1 in shurium.conf                                        │
 │   • Check GPU is detected: getmininginfo shows "gpus"                   │
 │                                                                         │
 │   ─────────────────────────────────────────────────────────────────     │
@@ -626,37 +626,37 @@ Think of mining like a job marketplace:
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                                                                         │
-│                    THE CASE FOR SHURIUM MINING                            │
+│                    THE CASE FOR SHURIUM MINING                          │
 │                                                                         │
 │   1. YOUR WORK MATTERS                                                  │
 │   ────────────────────                                                  │
 │                                                                         │
 │   Bitcoin: Your electricity finds random numbers, then throws away      │
-│   SHURIUM: Your electricity trains AI, advances science, helps humanity   │
+│   SHURIUM: Your electricity trains AI, advances science, helps humanity │
 │                                                                         │
 │   2. NO ASIC ARMS RACE                                                  │
 │   ─────────────────────                                                 │
 │                                                                         │
 │   Bitcoin: Requires specialized $10,000+ ASIC hardware                  │
-│   SHURIUM: Works with regular CPUs/GPUs you already have                  │
+│   SHURIUM: Works with regular CPUs/GPUs you already have                │
 │                                                                         │
 │   3. MULTIPLE REVENUE STREAMS                                           │
 │   ──────────────────────────                                            │
 │                                                                         │
 │   Bitcoin: Only block rewards                                           │
-│   SHURIUM: Block rewards + problem bounties + future compute fees         │
+│   SHURIUM: Block rewards + problem bounties + future compute fees       │
 │                                                                         │
 │   4. FEEL GOOD ABOUT YOUR WORK                                          │
 │   ────────────────────────────                                          │
 │                                                                         │
 │   Bitcoin: "I guess I made some random numbers today"                   │
-│   SHURIUM: "I helped train a cancer detection AI today"                   │
+│   SHURIUM: "I helped train a cancer detection AI today"                 │
 │                                                                         │
 │   5. GROWING ECOSYSTEM                                                  │
 │   ────────────────────                                                  │
 │                                                                         │
 │   Bitcoin: Mature, competitive, hard to profit                          │
-│   SHURIUM: Early stage, room to grow, first-mover advantage               │
+│   SHURIUM: Early stage, room to grow, first-mover advantage             │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```

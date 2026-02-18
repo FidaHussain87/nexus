@@ -15,9 +15,9 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                                                                         │
-│                    WHAT IS UBI IN SHURIUM?                                │
+│                    WHAT IS UBI IN SHURIUM?                              │
 │                                                                         │
-│   Every day, 30% of ALL new SHURIUM coins are shared equally              │
+│   Every day, 30% of ALL new SHURIUM coins are shared equally            │
 │   among ALL verified human users.                                       │
 │                                                                         │
 │   Not corporations. Not bots. Not whales.                               │
@@ -27,7 +27,7 @@
 │   │                                                                 │   │
 │   │                        THE SIMPLE VERSION                       │   │
 │   │                                                                 │   │
-│   │   1. SHURIUM creates new coins every 30 seconds                   │   │
+│   │   1. SHURIUM creates new coins every 30 seconds                 │   │
 │   │   2. 30% goes to a shared pool                                  │   │
 │   │   3. Pool is divided equally among verified users               │   │
 │   │   4. Claim your share daily                                     │   │
@@ -87,7 +87,7 @@
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │                                                                 │   │
 │   │   # Register your identity                                      │   │
-│   │   ./shurium-cli registeridentity                                  │   │
+│   │   ./shurium-cli registeridentity                                │   │
 │   │                                                                 │   │
 │   │   This creates a special cryptographic commitment that:         │   │
 │   │   • Proves you're a unique person                               │   │
@@ -102,7 +102,7 @@
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │                                                                 │   │
 │   │   # Check your status                                           │   │
-│   │   ./shurium-cli getidentitystatus                                 │   │
+│   │   ./shurium-cli getidentitystatus                               │   │
 │   │                                                                 │   │
 │   │   Status: Pending → Active                                      │   │
 │   │                                                                 │   │
@@ -116,7 +116,7 @@
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │                                                                 │   │
 │   │   # Claim today's UBI                                           │   │
-│   │   ./shurium-cli claimubi                                          │   │
+│   │   ./shurium-cli claimubi                                        │   │
 │   │                                                                 │   │
 │   │   ✓ Generating proof...                                         │   │
 │   │   ✓ Submitting claim...                                         │   │
@@ -160,7 +160,7 @@
 │   │                                                                 │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
-│   HOW IT WORKS IN SHURIUM:                                                │
+│   HOW IT WORKS IN SHURIUM:                                              │
 │                                                                         │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │                                                                 │   │
@@ -348,12 +348,12 @@
 │   │                                                                 │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
-│   SHURIUM SOLUTION:                                                       │
+│   SHURIUM SOLUTION:                                                     │
 │   ───────────────                                                       │
 │                                                                         │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │                                                                 │   │
-│   │   SHURIUM DISTRIBUTION:                                           │   │
+│   │   SHURIUM DISTRIBUTION:                                         │   │
 │   │                                                                 │   │
 │   │   • 30% of new coins go to ALL verified humans equally          │   │
 │   │   • Don't need expensive hardware                               │   │
@@ -403,29 +403,29 @@
 │   ────────────                                                          │
 │                                                                         │
 │   # Register for UBI (one time)                                         │
-│   ./shurium-cli registeridentity                                          │
+│   ./shurium-cli registeridentity                                        │
 │                                                                         │
 │   # Check registration status                                           │
-│   ./shurium-cli getidentitystatus                                         │
+│   ./shurium-cli getidentitystatus                                       │
 │   # Returns: pending, active, suspended, or revoked                     │
 │                                                                         │
 │   CLAIMING                                                              │
 │   ────────                                                              │
 │                                                                         │
 │   # Claim today's UBI                                                   │
-│   ./shurium-cli claimubi                                                  │
+│   ./shurium-cli claimubi                                                │
 │                                                                         │
 │   # Check if you've claimed today                                       │
-│   ./shurium-cli getubistatus                                              │
+│   ./shurium-cli getubistatus                                            │
 │                                                                         │
 │   # See UBI history                                                     │
-│   ./shurium-cli listubihistory                                            │
+│   ./shurium-cli listubihistory                                          │
 │                                                                         │
 │   POOL INFO                                                             │
 │   ─────────                                                             │
 │                                                                         │
 │   # See current UBI pool                                                │
-│   ./shurium-cli getubipoolinfo                                            │
+│   ./shurium-cli getubipoolinfo                                          │
 │                                                                         │
 │   # Returns:                                                            │
 │   # - Current pool balance                                              │
@@ -490,7 +490,7 @@
 │                                                                         │
 │   Q: Will UBI ever run out?                                             │
 │   ─────────────────────────                                             │
-│   A: No! SHURIUM has a minimum block reward of 1 SHR forever.             │
+│   A: No! SHURIUM has a minimum block reward of 1 SHR forever.           │
 │      UBI continues indefinitely.                                        │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘

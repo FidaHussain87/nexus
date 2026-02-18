@@ -94,11 +94,11 @@ error: couldn't connect to server: unknown (code -1)
 │             CONNECTION TROUBLESHOOTING CHECKLIST                    │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│   □ Is shuriumd running?                                              │
-│     → ps aux | grep shuriumd                                          │
+│   □ Is shuriumd running?                                            │
+│     → ps aux | grep shuriumd                                        │
 │                                                                     │
 │   □ Is RPC server enabled?                                          │
-│     → Check ~/.shurium/shurium.conf has: server=1                       │
+│     → Check ~/.shurium/shurium.conf has: server=1                   │
 │                                                                     │
 │   □ Do RPC credentials match?                                       │
 │     → Check rpcuser and rpcpassword in config                       │
@@ -280,7 +280,7 @@ cp ~/backup/wallet.dat ~/.shurium/wallet.dat
 │                                                                     │
 │   Option 2: Replace-By-Fee (if enabled)                             │
 │   • Send same transaction with higher fee                           │
-│   • ./shurium-cli bumpfee "TX_ID"                                     │
+│   • ./shurium-cli bumpfee "TX_ID"                                   │
 │                                                                     │
 │   Option 3: Wait for expiry                                         │
 │   • Unconfirmed txs eventually drop from mempool                    │

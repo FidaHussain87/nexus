@@ -19,7 +19,7 @@
 │                                                                         │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │                                                                 │   │
-│   │              BTC      ETH      SOL      ADA      SHURIUM          │   │
+│   │              BTC      ETH      SOL      ADA      SHURIUM        │   │
 │   │              ═══      ═══      ═══      ═══      ═════          │   │
 │   │                                                                 │   │
 │   │  Useful       ✗        ✗        ✗        ✗        ✓             │   │
@@ -57,11 +57,11 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                                                                         │
-│                    SHURIUM vs BITCOIN                                     │
+│                    SHURIUM vs BITCOIN                                   │
 │                                                                         │
 │   ┌────────────────────────────────────────────────────────────────┐    │
 │   │                                                                │    │
-│   │   FEATURE           │  BITCOIN         │  SHURIUM                │    │
+│   │   FEATURE           │  BITCOIN         │  SHURIUM              │    │
 │   │   ──────────────────┼──────────────────┼────────────────────── │    │
 │   │                     │                  │                       │    │
 │   │   Block Time        │  10 minutes      │  30 seconds           │    │
@@ -92,7 +92,7 @@
 │   └────────────────────────────────────────────────────────────────┘    │
 │                                                                         │
 │   THE BOTTOM LINE:                                                      │
-│   Bitcoin was revolutionary in 2009. SHURIUM builds on those ideas        │
+│   Bitcoin was revolutionary in 2009. SHURIUM builds on those ideas      │
 │   while solving Bitcoin's biggest problems: waste, inequality,          │
 │   volatility, and governance.                                           │
 │                                                                         │
@@ -131,7 +131,7 @@
 │   │                                                                 │   │
 │   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
-│   SHURIUM'S APPROACH:                                                     │
+│   SHURIUM'S APPROACH:                                                   │
 │   ─────────────────                                                     │
 │                                                                         │
 │   Question: "Train this AI model" or "Run this simulation"              │
@@ -141,11 +141,11 @@
 │                                                                         │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │                                                                 │   │
-│   │   SHURIUM ENERGY USE                                              │   │
+│   │   SHURIUM ENERGY USE                                            │   │
 │   │                                                                 │   │
 │   │   Same energy → Actual useful output                            │   │
 │   │                                                                 │   │
-│   │   Examples of what SHURIUM mining produces:                       │   │
+│   │   Examples of what SHURIUM mining produces:                     │   │
 │   │   • AI models that detect diseases                              │   │
 │   │   • Climate simulations that inform policy                      │   │
 │   │   • Protein folding that enables drug discovery                 │   │
@@ -165,11 +165,11 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                                                                         │
-│                    SHURIUM vs ETHEREUM                                    │
+│                    SHURIUM vs ETHEREUM                                  │
 │                                                                         │
 │   ┌────────────────────────────────────────────────────────────────┐    │
 │   │                                                                │    │
-│   │   FEATURE           │  ETHEREUM        │  SHURIUM                │    │
+│   │   FEATURE           │  ETHEREUM        │  SHURIUM              │    │
 │   │   ──────────────────┼──────────────────┼────────────────────── │    │
 │   │                     │                  │                       │    │
 │   │   Block Time        │  ~12 seconds     │  30 seconds           │    │
@@ -196,7 +196,7 @@
 │   └────────────────────────────────────────────────────────────────┘    │
 │                                                                         │
 │   THE BOTTOM LINE:                                                      │
-│   Ethereum pioneered smart contracts. SHURIUM focuses on different        │
+│   Ethereum pioneered smart contracts. SHURIUM focuses on different      │
 │   priorities: useful work, UBI, stability, and privacy-preserving       │
 │   identity. Different tools for different jobs.                         │
 │                                                                         │
@@ -210,11 +210,11 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                                                                         │
-│                    SHURIUM vs STABLECOINS                                 │
+│                    SHURIUM vs STABLECOINS                               │
 │                                                                         │
 │   ┌────────────────────────────────────────────────────────────────┐    │
 │   │                                                                │    │
-│   │   FEATURE           │  USDC/USDT       │  SHURIUM                │    │
+│   │   FEATURE           │  USDC/USDT       │  SHURIUM              │    │
 │   │   ──────────────────┼──────────────────┼────────────────────── │    │
 │   │                     │                  │                       │    │
 │   │   Stability         │  Hard peg ($1)   │  Soft peg (~$1)       │    │
@@ -241,7 +241,7 @@
 │   └────────────────────────────────────────────────────────────────┘    │
 │                                                                         │
 │   THE BOTTOM LINE:                                                      │
-│   Stablecoins are convenient but centralized. SHURIUM offers stability    │
+│   Stablecoins are convenient but centralized. SHURIUM offers stability  │
 │   WITHOUT sacrificing decentralization. Plus UBI and mining rewards!    │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -254,11 +254,11 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                                                                         │
-│                    SHURIUM vs PRIVACY COINS                               │
+│                    SHURIUM vs PRIVACY COINS                             │
 │                                                                         │
 │   ┌────────────────────────────────────────────────────────────────┐    │
 │   │                                                                │    │
-│   │   FEATURE           │  MONERO/ZCASH    │  SHURIUM                │    │
+│   │   FEATURE           │  MONERO/ZCASH    │  SHURIUM              │    │
 │   │   ──────────────────┼──────────────────┼────────────────────── │    │
 │   │                     │                  │                       │    │
 │   │   Transaction       │  Fully private   │  Transparent          │    │
@@ -280,7 +280,7 @@
 │   └────────────────────────────────────────────────────────────────┘    │
 │                                                                         │
 │   THE BOTTOM LINE:                                                      │
-│   Monero/ZCash prioritize transaction privacy. SHURIUM prioritizes        │
+│   Monero/ZCash prioritize transaction privacy. SHURIUM prioritizes      │
 │   IDENTITY privacy (claim UBI without revealing who you are).           │
 │   Different privacy goals for different use cases.                      │
 │                                                                         │
@@ -294,7 +294,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                                                                         │
-│                    WHAT ONLY SHURIUM DOES                                 │
+│                    WHAT ONLY SHURIUM DOES                               │
 │                                                                         │
 │   No other cryptocurrency combines ALL of these:                        │
 │                                                                         │
@@ -353,7 +353,7 @@
 │                                                                         │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │                                                                 │   │
-│   │                BTC        ETH        SOL        SHURIUM           │   │
+│   │                BTC        ETH        SOL        SHURIUM         │   │
 │   │   ────────────────────────────────────────────────────────────  │   │
 │   │                                                                 │   │
 │   │   Block Time   10 min     ~12 sec    ~0.4 sec   30 sec          │   │
@@ -417,7 +417,7 @@
 │   • You need high transaction throughput                                │
 │   • Low fees are essential                                              │
 │                                                                         │
-│   USE SHURIUM WHEN:                                                       │
+│   USE SHURIUM WHEN:                                                     │
 │   ────────────────                                                      │
 │   • You want environmentally responsible mining                         │
 │   • UBI and fair distribution matter to you                             │

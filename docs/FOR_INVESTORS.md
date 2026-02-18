@@ -17,7 +17,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                                                                         │
-│                    SHURIUM AT A GLANCE                                    │
+│                    SHURIUM AT A GLANCE                                  │
 │                                                                         │
 │   Symbol:          SHR                                                  │
 │   Total Supply:    21,000,000,000 (21 Billion)                          │
@@ -56,18 +56,18 @@
 │   │   2. CLOUD COMPUTING                   ~$500 Billion           │    │
 │   │      Growing at 20%+ annually                                  │    │
 │   │      Dominated by 3 players (AWS, Azure, GCP)                  │    │
-│   │      SHURIUM offers decentralized alternative                    │    │
+│   │      SHURIUM offers decentralized alternative                  │    │
 │   │                                                                │    │
 │   │   3. AI/ML COMPUTE                     ~$200 Billion           │    │
 │   │      Growing at 40%+ annually                                  │    │
 │   │      Massive demand for GPU/compute                            │    │
-│   │      SHURIUM miners provide this                                 │    │
+│   │      SHURIUM miners provide this                               │    │
 │   │                                                                │    │
 │   │   TOTAL ADDRESSABLE MARKET: $2.7+ Trillion and growing         │    │
 │   │                                                                │    │
 │   └────────────────────────────────────────────────────────────────┘    │
 │                                                                         │
-│   SHURIUM sits at the intersection of ALL THREE.                          │
+│   SHURIUM sits at the intersection of ALL THREE.                        │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -87,7 +87,7 @@
 │   │  First-mover in "useful mining"                                 │   │
 │   │  • Patents pending on verification methods                      │   │
 │   │  • Network effects: More problems → More miners → More value    │   │
-│   │  • Switching costs: Miners invest in SHURIUM-specific setup       │   │
+│   │  • Switching costs: Miners invest in SHURIUM-specific setup     │   │
 │   │                                                                 │   │
 │   │  MOAT 2: UBI NETWORK EFFECTS                                    │   │
 │   │  ────────────────────────────                                   │   │
@@ -313,7 +313,7 @@
 │                                                                         │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │                                                                 │   │
-│   │              BTC    ETH    SOL    ADA    SHURIUM                  │   │
+│   │              BTC    ETH    SOL    ADA    SHURIUM                │   │
 │   │              ───    ───    ───    ───    ─────                  │   │
 │   │                                                                 │   │
 │   │  Useful Mining   ✗      ✗      ✗      ✗      ✓                  │   │
@@ -337,7 +337,7 @@
 │   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
 │   KEY DIFFERENTIATOR:                                                   │
-│   SHURIUM is the ONLY project combining all five innovations:             │
+│   SHURIUM is the ONLY project combining all five innovations:           │
 │   Useful Work + UBI + Stability + Privacy Identity + Governance         │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -426,7 +426,7 @@
 │   4. ECOSYSTEM DEVELOPMENT                                              │
 │   ────────────────────────                                              │
 │                                                                         │
-│   • Build applications on SHURIUM                                         │
+│   • Build applications on SHURIUM                                       │
 │   • Receive grants from ecosystem fund                                  │
 │   • Earn contributor rewards (15% of blocks)                            │
 │                                                                         │
@@ -449,7 +449,7 @@
 │                                                                         │
 │                    GOVERNANCE STRUCTURE                                 │
 │                                                                         │
-│   SHURIUM is designed to be PROGRESSIVELY DECENTRALIZED:                  │
+│   SHURIUM is designed to be PROGRESSIVELY DECENTRALIZED:                │
 │                                                                         │
 │   PHASE 1: Foundation-Led (Current)                                     │
 │   ─────────────────────────────────                                     │
@@ -496,7 +496,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                                                                         │
-│                    WHY INVEST IN SHURIUM?                                 │
+│                    WHY INVEST IN SHURIUM?                               │
 │                                                                         │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │                                                                 │   │
@@ -525,7 +525,7 @@
 │                                                                         │
 │   THE BOTTOM LINE:                                                      │
 │                                                                         │
-│   SHURIUM isn't just trying to be a better Bitcoin.                       │
+│   SHURIUM isn't just trying to be a better Bitcoin.                     │
 │   It's trying to build a better economic system.                        │
 │                                                                         │
 │   One where technology serves humanity,                                 │

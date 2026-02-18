@@ -37,7 +37,7 @@ Mining is like being a **security guard + accountant** for the SHURIUM network:
 │        │        • No double-spending?                               │
 │        ▼                                                            │
 │   3. SOLVE      Complete a computational challenge                  │
-│        │        (In SHURIUM: useful real-world problems!)             │
+│        │        (In SHURIUM: useful real-world problems!)           │
 │        │                                                            │
 │        ▼                                                            │
 │   4. BROADCAST  Announce new block to network                       │
@@ -252,10 +252,10 @@ maxmempool=512
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│              TRADITIONAL MINING vs SHURIUM MINING                     │
+│              TRADITIONAL MINING vs SHURIUM MINING                   │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│   BITCOIN (Proof of Work)         SHURIUM (Proof of Useful Work)      │
+│   BITCOIN (Proof of Work)         SHURIUM (Proof of Useful Work)    │
 │   ───────────────────────         ─────────────────────────────     │
 │                                                                     │
 │   🎲 Solve meaningless puzzles    🔬 Solve REAL problems            │
@@ -557,7 +557,7 @@ tail -100 ~/.shurium/debug.log
 │   1. Mine only during off-peak hours (cheaper electricity)          │
 │                                                                     │
 │   2. Reduce mining threads:                                         │
-│      ./shurium-cli setgenerate true 2  (instead of 4+)                │
+│      ./shurium-cli setgenerate true 2  (instead of 4+)              │
 │                                                                     │
 │   3. Consider staking instead - uses minimal power                  │
 │                                                                     │

@@ -85,7 +85,7 @@ The world needs a digital currency that:
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                                                                         │
-│                         SHURIUM VISION                                    │
+│                         SHURIUM VISION                                  │
 │                                                                         │
 │   "A world where the technology that secures our money                  │
 │    also advances science, supports everyone equally,                    │
@@ -170,7 +170,7 @@ Think of SHURIUM like a **global community piggy bank** with special rules:
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
 │                                                                        │
-│  BITCOIN MINING                       SHURIUM MINING                     │
+│  BITCOIN MINING                       SHURIUM MINING                   │
 │  ─────────────                        ────────────                     │
 │                                                                        │
 │  Question:                            Question:                        │
@@ -195,7 +195,7 @@ Think of SHURIUM like a **global community piggy bank** with special rules:
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                                                                         │
-│                    WHAT SHURIUM MINERS CAN SOLVE                          │
+│                    WHAT SHURIUM MINERS CAN SOLVE                        │
 │                                                                         │
 │   🤖 AI/MACHINE LEARNING                                                │
 │   │                                                                     │
@@ -243,7 +243,7 @@ SHURIUM is built on five revolutionary innovations:
 │  │                                                                  │   │
 │  │   ┌─────────┐      ┌─────────────┐      ┌─────────┐              │   │
 │  │   │         │      │             │      │         │              │   │
-│  │   │ Problem │ ───► │   SHURIUM     │ ───► │ Solution│              │   │
+│  │   │ Problem │ ───► │   SHURIUM   │ ───► │ Solution│              │   │
 │  │   │ Poster  │      │  NETWORK    │      │ Finder  │              │   │
 │  │   │         │      │             │      │ (Miner) │              │   │
 │  │   └─────────┘      └─────────────┘      └─────────┘              │   │
@@ -253,7 +253,7 @@ SHURIUM is built on five revolutionary innovations:
 │  │        │                                      │                  │   │
 │  │        ▼                                      ▼                  │   │
 │  │   ┌─────────────────────────────────────────────┐                │   │
-│  │   │         EVERYONE WINS                        │               │   │
+│  │   │         EVERYONE WINS                       │                │   │
 │  │   │                                             │                │   │
 │  │   │  • Poster gets computation done             │                │   │
 │  │   │  • Miner earns cryptocurrency               │                │   │
@@ -344,7 +344,7 @@ SHURIUM is built on five revolutionary innovations:
 │  │                                                                 │  │
 │  │   ┌─────────────────────────────────────────────────────────┐   │  │
 │  │   │                                                         │   │  │
-│  │   │   YOU                              SHURIUM NETWORK        │   │  │
+│  │   │   YOU                              SHURIUM NETWORK      │   │  │
 │  │   │                                                         │   │  │
 │  │   │   "I am a verified       ───►     "Yes, this proof      │   │  │
 │  │   │    unique human"                   is mathematically    │   │  │
@@ -398,7 +398,7 @@ SHURIUM is built on five revolutionary innovations:
 │                                                                        │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
 │  │                                                                  │  │
-│  │   SHURIUM STABILITY SYSTEM                                         │  │
+│  │   SHURIUM STABILITY SYSTEM                                       │  │
 │  │                                                                  │  │
 │  │   TARGET: $1.00 (with 5% tolerance band)                         │  │
 │  │                                                                  │  │
@@ -453,7 +453,7 @@ SHURIUM is built on five revolutionary innovations:
 │                                                                        │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
 │  │                                                                  │  │
-│  │   SHURIUM GOVERNANCE: YOUR VOICE MATTERS                           │  │
+│  │   SHURIUM GOVERNANCE: YOUR VOICE MATTERS                         │  │
 │  │                                                                  │  │
 │  │   ┌─────────────────────────────────────────────────────────┐    │  │
 │  │   │                                                         │    │  │
@@ -509,7 +509,7 @@ SHURIUM is built on five revolutionary innovations:
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                                                                         │
-│                    SHURIUM TOKEN ECONOMICS                                │
+│                    SHURIUM TOKEN ECONOMICS                              │
 │                                                                         │
 │   BASIC INFO                                                            │
 │   ───────────                                                           │
@@ -568,7 +568,7 @@ SHURIUM is built on five revolutionary innovations:
 │   KEY DIFFERENCE FROM BITCOIN:                                          │
 │   ─────────────────────────────                                         │
 │   Bitcoin:  Reward goes to ZERO (year ~2140)                            │
-│   SHURIUM:    Minimum 1 SHR/block FOREVER (perpetual UBI!)                │
+│   SHURIUM:    Minimum 1 SHR/block FOREVER (perpetual UBI!)              │
 │                                                                         │
 │   This means:                                                           │
 │   • Network security is always funded                                   │
@@ -616,7 +616,7 @@ SHURIUM is built on five revolutionary innovations:
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                                                                         │
-│                         SHURIUM ROADMAP                                   │
+│                         SHURIUM ROADMAP                                 │
 │                                                                         │
 │   PHASE 1: FOUNDATION ✓                                                 │
 │   ─────────────────────                                                 │
@@ -670,11 +670,11 @@ SHURIUM is built on five revolutionary innovations:
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                                                                         │
-│                    SHURIUM: THE COMPLETE PICTURE                          │
+│                    SHURIUM: THE COMPLETE PICTURE                        │
 │                                                                         │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │                                                                 │   │
-│   │                     SHURIUM NETWORK                               │   │
+│   │                     SHURIUM NETWORK                             │   │
 │   │                                                                 │   │
 │   │    ┌─────────┐     ┌─────────┐     ┌─────────┐                  │   │
 │   │    │ USEFUL  │     │  UBI    │     │PRIVACY  │                  │   │

@@ -31,7 +31,7 @@ Staking is like putting your money in a **special savings account** that:
 │                      HOW STAKING WORKS                              │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│   TRADITIONAL SAVINGS                SHURIUM STAKING                  │
+│   TRADITIONAL SAVINGS                SHURIUM STAKING                │
 │   ──────────────────                ──────────────                  │
 │                                                                     │
 │   💰 Deposit money in bank          🔒 Lock coins as collateral     │
@@ -326,11 +326,11 @@ Total Pending Rewards: 18.3 SHR
 │   • Internet: 100 Mbps, static IP preferred                         │
 │                                                                     │
 │   SOFTWARE                                                          │
-│   • SHURIUM node (latest version)                                     │
+│   • SHURIUM node (latest version)                                   │
 │   • Linux recommended (Ubuntu 20.04+)                               │
 │                                                                     │
 │   STAKE                                                             │
-│   • Minimum stake: Check ./shurium-cli getstakinginfo                 │
+│   • Minimum stake: Check ./shurium-cli getstakinginfo               │
 │   • Recommended: 2-3x minimum for buffer                            │
 │                                                                     │
 │   COMMITMENT                                                        │

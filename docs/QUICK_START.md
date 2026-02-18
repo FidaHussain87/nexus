@@ -177,7 +177,7 @@ SHURIUM has **two main programs** that work together:
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                                                                     │
-│   shuriumd (Daemon)         shurium-cli (Client)                        │
+│   shuriumd (Daemon)         shurium-cli (Client)                    │
 │   ================        ==================                        │
 │                                                                     │
 │   - Runs in background    - Sends commands to daemon                │
@@ -691,11 +691,11 @@ For more details, see [Wallet Guide - Backup and Recovery](WALLET_GUIDE.md#-back
 │   - Separate wallet                 - Separate wallet               │
 │                                                                     │
 │   Command:                          Command:                        │
-│   ./shuriumd --testnet                ./shuriumd                        │
-│   ./shurium-cli --testnet ...         ./shurium-cli ...                 │
+│   ./shuriumd --testnet                ./shuriumd                    │
+│   ./shurium-cli --testnet ...         ./shurium-cli ...             │
 │                                                                     │
 │   Wallet location:                  Wallet location:                │
-│   ~/.shurium/testnet/wallet.dat       ~/.shurium/wallet.dat             │
+│   ~/.shurium/testnet/wallet.dat       ~/.shurium/wallet.dat         │
 │                                                                     │
 │   Address prefix: tshr1...          Address prefix: shr1...         │
 │                                                                     │
