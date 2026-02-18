@@ -39,7 +39,7 @@ constexpr const char* DEFAULT_DATADIR_NAME = ".shurium";
 #endif
 
 /// Default config file name
-constexpr const char* DEFAULT_CONFIG_FILENAME = "nexus.conf";
+constexpr const char* DEFAULT_CONFIG_FILENAME = "shurium.conf";
 
 /// Maximum config file size (1 MB)
 constexpr size_t MAX_CONFIG_SIZE = 1024 * 1024;
@@ -107,8 +107,8 @@ struct ConfigParseResult {
  * Priority order (highest to lowest):
  * 1. Command-line arguments
  * 2. Data directory config file
- * 3. User config file (~/.shurium/nexus.conf)
- * 4. System config file (/etc/nexus/nexus.conf)
+ * 3. User config file (~/.shurium/shurium.conf)
+ * 4. System config file (/etc/shurium/shurium.conf)
  * 5. Built-in defaults
  */
 class ConfigManager {

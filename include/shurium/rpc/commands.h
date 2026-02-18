@@ -499,6 +499,10 @@ RPCResponse cmd_listproblems(const RPCRequest& req, const RPCContext& ctx,
 RPCResponse cmd_getproblem(const RPCRequest& req, const RPCContext& ctx,
                            RPCCommandTable* table);
 
+/// Generate blocks to address (regtest only)
+RPCResponse cmd_generatetoaddress(const RPCRequest& req, const RPCContext& ctx,
+                                  RPCCommandTable* table);
+
 // ============================================================================
 // Utility Commands
 // ============================================================================

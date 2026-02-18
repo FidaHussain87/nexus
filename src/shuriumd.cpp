@@ -64,7 +64,7 @@ constexpr const char* CLIENT_NAME = "SHURIUM Daemon";
 
 namespace defaults {
     constexpr const char* DATADIR_NAME = ".shurium";
-    constexpr const char* CONFIG_FILENAME = "nexus.conf";
+    constexpr const char* CONFIG_FILENAME = "shurium.conf";
     constexpr const char* PID_FILENAME = "shuriumd.pid";
     constexpr const char* LOG_FILENAME = "debug.log";
     
@@ -373,7 +373,7 @@ void PrintHelp() {
     std::cout << "Options:\n";
     std::cout << "  -h, --help                 Show this help message\n";
     std::cout << "  -v, --version              Show version information\n";
-    std::cout << "  -c, --conf=FILE            Config file path (default: <datadir>/nexus.conf)\n";
+    std::cout << "  -c, --conf=FILE            Config file path (default: <datadir>/shurium.conf)\n";
     std::cout << "  -d, --datadir=DIR          Data directory path\n";
     std::cout << "  -D, --daemon               Run as daemon in background\n";
     std::cout << "  --testnet                  Use testnet\n";

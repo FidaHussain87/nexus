@@ -566,11 +566,11 @@ public:
     
     /// Send to recipients
     BuildTxResult SendToRecipients(const std::vector<Recipient>& recipients,
-                                    FeeRate feeRate = 1);
+                                    FeeRate feeRate = 1000);
     
     /// Send to single address
     BuildTxResult SendToAddress(const std::string& address, Amount amount,
-                                 FeeRate feeRate = 1);
+                                 FeeRate feeRate = 1000);
     
     /// Sign a transaction
     bool SignTransaction(MutableTransaction& tx);

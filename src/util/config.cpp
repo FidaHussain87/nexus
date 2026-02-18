@@ -575,7 +575,7 @@ ConfigParseResult ConfigManager::LoadAllConfigs(const std::string& dataDir) {
     
     // System config (lowest priority)
 #ifndef _WIN32
-    std::string systemConfig = "/etc/nexus/nexus.conf";
+    std::string systemConfig = "/etc/shurium/shurium.conf";
     std::ifstream testSystem(systemConfig);
     if (testSystem.is_open()) {
         testSystem.close();

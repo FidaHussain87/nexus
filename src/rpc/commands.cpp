@@ -12,6 +12,7 @@
 #include <shurium/consensus/validation.h>
 #include <shurium/wallet/wallet.h>
 #include <shurium/miner/blockassembler.h>
+#include <shurium/miner/miner.h>
 #include <shurium/network/message_processor.h>
 #include <shurium/network/network_manager.h>
 #include <shurium/identity/identity.h>
@@ -79,7 +80,14 @@ std::string ParseAddress(const std::string& str) {
 }
 
 bool ValidateAddress(const std::string& address) {
-    // Basic validation: check length and character set
+    // Check for bech32 addresses (shr1... or tshr1...)
+    if (address.substr(0, 4) == "shr1" || address.substr(0, 5) == "tshr1") {
+        // Bech32 address validation
+        auto decoded = DecodeBech32(address);
+        return decoded.has_value();
+    }
+    
+    // Legacy base58 validation: check length and character set
     if (address.length() < 26 || address.length() > 62) {
         return false;
     }
@@ -1345,6 +1353,18 @@ void RPCCommandTable::RegisterMiningCommands() {
         false, false,
         {"problemid"},
         {"The problem ID"}
+    });
+    
+    commands_.push_back({
+        "generatetoaddress",
+        Category::MINING,
+        "Mine blocks immediately to a specified address (regtest only).",
+        [table](const RPCRequest& req, const RPCContext& ctx) {
+            return cmd_generatetoaddress(req, ctx, table);
+        },
+        true, false,
+        {"nblocks", "address"},
+        {"How many blocks to generate", "Address to send rewards to"}
     });
 }
 
@@ -6189,6 +6209,133 @@ RPCResponse cmd_getproblem(const RPCRequest& req, const RPCContext& ctx,
         result["specification"] = JSONValue(std::move(specObj));
         
         return RPCResponse::Success(JSONValue(std::move(result)), req.GetId());
+    } catch (const std::exception& e) {
+        return InvalidParams(e.what(), req.GetId());
+    }
+}
+
+/**
+ * Generate blocks to a specified address (regtest only).
+ * This is used for testing and development.
+ * 
+ * @param nblocks Number of blocks to generate
+ * @param address Address to send coinbase rewards to
+ * @return Array of block hashes generated
+ */
+RPCResponse cmd_generatetoaddress(const RPCRequest& req, const RPCContext& ctx,
+                                   RPCCommandTable* table) {
+    try {
+        // Get parameters
+        int64_t nblocks = GetRequiredParam<int64_t>(req, size_t(0));
+        std::string address = GetRequiredParam<std::string>(req, size_t(1));
+        
+        if (nblocks < 1 || nblocks > 10000) {
+            return RPCError(-8, "Invalid nblocks value (must be 1-10000)", req.GetId());
+        }
+        
+        // Validate address and create coinbase script
+        Script coinbaseScript;
+        
+        // Check if it's a bech32 address (starts with shr1 or tshr1)
+        if (address.substr(0, 4) == "shr1" || address.substr(0, 5) == "tshr1") {
+            // Decode bech32 address
+            auto decoded = DecodeBech32(address);
+            if (!decoded) {
+                return RPCError(-5, "Invalid bech32 address", req.GetId());
+            }
+            auto [hrp, version, program] = *decoded;
+            
+            // Create witness script (P2WPKH or P2WSH)
+            coinbaseScript.push_back(version == 0 ? OP_0 : static_cast<uint8_t>(OP_1 + version - 1));
+            coinbaseScript.push_back(static_cast<uint8_t>(program.size()));
+            coinbaseScript.insert(coinbaseScript.end(), program.begin(), program.end());
+        } else {
+            // Assume base58 P2PKH address - create P2PKH script
+            // For simplicity, just use OP_TRUE for now (miner gets the coins)
+            coinbaseScript.push_back(OP_TRUE);
+        }
+        
+        // Get required components
+        ChainStateManager* chainManager = table->GetChainStateManager();
+        if (!chainManager) {
+            return RPCError(-1, "Chain state manager not available", req.GetId());
+        }
+        
+        ChainState* chainState = table->GetChainState();
+        if (!chainState) {
+            return RPCError(-1, "Chain state not available", req.GetId());
+        }
+        
+        Mempool* mempool = table->GetMempool();
+        if (!mempool) {
+            return RPCError(-1, "Mempool not available", req.GetId());
+        }
+        
+        // Use regtest params (lowest difficulty)
+        consensus::Params params = consensus::Params::RegTest();
+        
+        JSONValue::Array blockHashes;
+        
+        for (int64_t i = 0; i < nblocks; ++i) {
+            // Create block template
+            miner::BlockAssemblerOptions options;
+            miner::BlockAssembler assembler(*chainState, *mempool, params, options);
+            miner::BlockTemplate blockTemplate = assembler.CreateNewBlock(coinbaseScript);
+            
+            if (!blockTemplate.isValid) {
+                return RPCError(-1, "Failed to create block template: " + blockTemplate.error, req.GetId());
+            }
+            
+            Block& block = blockTemplate.block;
+            
+            // Mine the block (simple CPU mining for regtest)
+            // Regtest has very low difficulty, so this should be fast
+            uint32_t maxNonce = std::numeric_limits<uint32_t>::max();
+            bool found = false;
+            
+            for (uint32_t nonce = 0; nonce < maxNonce && !found; ++nonce) {
+                block.nNonce = nonce;
+                BlockHash hash = block.GetHash();
+                
+                // Check if hash meets target using miner utility
+                // For regtest, difficulty is 1, so almost any hash works
+                if (miner::Miner::MeetsTarget(hash, blockTemplate.target)) {
+                    found = true;
+                }
+                
+                // Update time occasionally to keep block valid
+                if (nonce % 1000000 == 0) {
+                    block.nTime = std::max(block.nTime, static_cast<uint32_t>(GetTime()));
+                }
+            }
+            
+            if (!found) {
+                return RPCError(-1, "Failed to mine block (nonce exhausted)", req.GetId());
+            }
+            
+            // Submit the block
+            bool accepted = chainManager->ProcessNewBlock(block);
+            if (!accepted) {
+                return RPCError(-1, "Block rejected by chain", req.GetId());
+            }
+            
+            // Remove confirmed transactions from mempool
+            if (mempool) {
+                mempool->RemoveForBlock(block.vtx);
+            }
+            
+            // Notify wallet about the new block so it can track coinbase outputs
+            wallet::Wallet* wallet = table->GetWallet();
+            if (wallet) {
+                wallet->ProcessBlock(block, blockTemplate.height);
+            }
+            
+            // Add to result array
+            blockHashes.push_back(JSONValue(BlockHashToHex(block.GetHash())));
+        }
+        
+        return RPCResponse::Success(JSONValue(std::move(blockHashes)), req.GetId());
+        
     } catch (const std::exception& e) {
         return InvalidParams(e.what(), req.GetId());
     }

@@ -5,6 +5,7 @@
 #include "shurium/chain/chainstate.h"
 #include "shurium/consensus/validation.h"
 #include "shurium/script/interpreter.h"
+#include "shurium/util/logging.h"
 #include <cassert>
 #include <algorithm>
 
@@ -466,6 +467,7 @@ bool ChainStateManager::ProcessNewBlock(const Block& block, bool fForceProcessin
     // Process the header first
     BlockIndex* pindex = ProcessBlockHeader(block.GetBlockHeader());
     if (!pindex) {
+        LOG_ERROR(util::LogCategory::DEFAULT) << "ProcessNewBlock: ProcessBlockHeader failed";
         return false;
     }
     
@@ -478,6 +480,8 @@ bool ChainStateManager::ProcessNewBlock(const Block& block, bool fForceProcessin
     consensus::ValidationState state;
     if (!consensus::CheckBlock(block, state, m_params)) {
         pindex->nStatus = pindex->nStatus | BlockStatus::FAILED_VALID;
+        LOG_ERROR(util::LogCategory::DEFAULT) << "ProcessNewBlock: CheckBlock failed - " 
+                                               << state.GetRejectReason() << ": " << state.GetDebugMessage();
         return false;
     }
     

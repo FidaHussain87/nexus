@@ -353,8 +353,8 @@ namespace AddressVersion {
 
 /// Human-readable part for Bech32 addresses
 namespace Bech32HRP {
-    constexpr const char* MAINNET = "nx";
-    constexpr const char* TESTNET = "tnx";
+    constexpr const char* MAINNET = "shr";
+    constexpr const char* TESTNET = "tshr";
 }
 
 /**
@@ -431,7 +431,7 @@ std::vector<uint8_t> DecodeBase58(const std::string& str);
 
 /**
  * Encode data as Bech32.
- * @param hrp Human-readable part (e.g., "nx" for SHURIUM mainnet)
+ * @param hrp Human-readable part (e.g., "shr" for SHURIUM mainnet)
  * @param version Witness version (0 for P2WPKH/P2WSH, 1 for P2TR)
  * @param data Program data (20 bytes for P2WPKH, 32 bytes for P2WSH/P2TR)
  */

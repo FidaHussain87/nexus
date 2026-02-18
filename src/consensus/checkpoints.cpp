@@ -264,17 +264,17 @@ namespace Checkpoints {
 
 std::vector<Checkpoint> GetMainnetCheckpoints() {
     // Checkpoints for SHURIUM mainnet
-    // Genesis hash computed from CreateGenesisBlock with mined nonce 171163
+    // Genesis hash computed from CreateGenesisBlock with mined nonce 1574105
     std::vector<Checkpoint> checkpoints;
     
     // Genesis block (height 0)
-    // Hash: 00000cfc4e649be69c27c167f6abdc7cdd0ac751b39f7aa50dc694f6ff4b56c6
+    // Hash: 0000033832a59d2d7d8b6766a1fc14769f7baf18797d3c233317968ab851ce92
     Checkpoint genesis;
     genesis.height = 0;
     genesis.timestamp = 1700000000;  // Genesis timestamp
     genesis.totalTxs = 1;
     genesis.description = "Genesis block";
-    genesis.hash = BlockHash(Hash256::FromHex("00000cfc4e649be69c27c167f6abdc7cdd0ac751b39f7aa50dc694f6ff4b56c6"));
+    genesis.hash = BlockHash(Hash256::FromHex("0000033832a59d2d7d8b6766a1fc14769f7baf18797d3c233317968ab851ce92"));
     checkpoints.push_back(genesis);
     
     // Future checkpoints will be added as the chain grows
@@ -292,17 +292,17 @@ std::vector<Checkpoint> GetMainnetCheckpoints() {
 
 std::vector<Checkpoint> GetTestnetCheckpoints() {
     // Testnet checkpoints
-    // Genesis hash computed from CreateGenesisBlock with mined nonce 811478
+    // Genesis hash computed from CreateGenesisBlock with mined nonce 723569
     std::vector<Checkpoint> checkpoints;
     
     // Genesis
-    // Hash: 000009deb6c76c91b812804272b582fe96e51f17299007ad60b21871f6756c52
+    // Hash: 000002e003b286da07d84f0ae82905175f39c835a9d94a8c7778f007d024acdf
     Checkpoint genesis;
     genesis.height = 0;
     genesis.timestamp = 1700000001;  // Testnet genesis timestamp (1 second after mainnet)
     genesis.totalTxs = 1;
     genesis.description = "Testnet genesis";
-    genesis.hash = BlockHash(Hash256::FromHex("000009deb6c76c91b812804272b582fe96e51f17299007ad60b21871f6756c52"));
+    genesis.hash = BlockHash(Hash256::FromHex("000002e003b286da07d84f0ae82905175f39c835a9d94a8c7778f007d024acdf"));
     checkpoints.push_back(genesis);
     
     return checkpoints;

@@ -46,7 +46,7 @@ constexpr const char* CLIENT_NAME = "SHURIUM CLI";
 
 namespace defaults {
     constexpr const char* DATADIR_NAME = ".shurium";
-    constexpr const char* CONFIG_FILENAME = "nexus.conf";
+    constexpr const char* CONFIG_FILENAME = "shurium.conf";
     constexpr const char* RPC_HOST = "127.0.0.1";
     constexpr uint16_t RPC_PORT = 8332;
     constexpr uint16_t TESTNET_RPC_PORT = 18332;

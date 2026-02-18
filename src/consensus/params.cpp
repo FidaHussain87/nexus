@@ -79,7 +79,7 @@ Params Params::Main() {
     // Create genesis block with mined nonce
     Block genesis = CreateGenesisBlock(
         1700000000,    // Timestamp
-        171163,        // Nonce (mined)
+        1574105,       // Nonce (mined)
         0x1e0fffff,    // Initial difficulty
         1,             // Version
         params.nInitialBlockReward
@@ -104,7 +104,7 @@ Params Params::TestNet() {
     // Create testnet genesis block with mined nonce
     Block genesis = CreateGenesisBlock(
         1700000001,    // Timestamp
-        811478,        // Nonce (mined)
+        723569,        // Nonce (mined)
         0x1e0fffff,    // Initial difficulty
         1,             // Version
         params.nInitialBlockReward
@@ -143,7 +143,7 @@ Params Params::RegTest() {
     // Create regtest genesis with mined nonce
     Block genesis = CreateGenesisBlock(
         1700000002,    // Timestamp
-        4,             // Nonce (mined)
+        0,             // Nonce (mined)
         0x207fffff,    // Very easy difficulty
         1,             // Version
         params.nInitialBlockReward
