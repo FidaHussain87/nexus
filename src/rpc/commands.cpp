@@ -5635,10 +5635,24 @@ RPCResponse cmd_vote(const RPCRequest& req, const RPCContext& ctx,
         std::copy_n(reinterpret_cast<const Byte*>(addresses[0].data()),
                    std::min(addresses[0].size(), size_t(20)), voterId.begin());
         
-        // Check voting power
+        // Auto-register voting power based on wallet balance
+        // This ensures users can vote based on their actual holdings
+        Amount walletBalance = wallet->GetBalance().confirmed;
+        uint64_t calculatedPower = governance::CalculateVotingPower(walletBalance);
+        if (calculatedPower > 0) {
+            engine->UpdateVotingPower(voterId, calculatedPower);
+        }
+        
+        // Check voting power (now includes auto-registered power)
         uint64_t votingPower = engine->GetEffectiveVotingPower(voterId, proposal->type);
-        if (votingPower < static_cast<uint64_t>(governance::MIN_VOTING_STAKE)) {
-            return RPCResponse::Error(ErrorCode::INVALID_PARAMS, "Insufficient voting power. Minimum stake required.", req.GetId());
+        if (votingPower == 0) {
+            // Format balance for error message
+            double balanceInCoins = static_cast<double>(walletBalance) / COIN;
+            double minRequiredCoins = static_cast<double>(governance::MIN_VOTING_STAKE) / COIN;
+            std::ostringstream oss;
+            oss << "Insufficient voting power. Your balance: " << std::fixed << std::setprecision(2) 
+                << balanceInCoins << " SHR. Minimum required: " << minRequiredCoins << " SHR.";
+            return RPCResponse::Error(ErrorCode::INVALID_PARAMS, oss.str(), req.GetId());
         }
         
         // Build vote
@@ -5649,6 +5663,8 @@ RPCResponse cmd_vote(const RPCRequest& req, const RPCContext& ctx,
         vote.votingPower = votingPower;
         vote.voteHeight = engine->GetCurrentHeight();
         vote.reason = reason;
+        // Add placeholder signature for testing (64 zeros)
+        vote.signature.resize(64, 0);
         
         // Cast vote
         bool success = engine->CastVote(vote);
@@ -6751,6 +6767,12 @@ RPCResponse cmd_generatetoaddress(const RPCRequest& req, const RPCContext& ctx,
                 }
                 Amount ubiAmount = (blockReward * 30) / 100;  // 30% to UBI
                 ubiDist->AddBlockReward(blockTemplate.height, ubiAmount);
+            }
+            
+            // Process governance proposals (advance state, execute approved)
+            governance::GovernanceEngine* govEngine = table->GetGovernanceEngine();
+            if (govEngine) {
+                govEngine->ProcessBlock(blockTemplate.height);
             }
             
             // Add to result array

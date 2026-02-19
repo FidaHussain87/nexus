@@ -1614,19 +1614,79 @@ Returns UBI claim history.
 
 ## 🗳️ Governance Commands
 
+SHURIUM features a complete on-chain democratic governance system that allows stakeholders to propose and vote on changes to network parameters, protocol upgrades, and constitutional amendments.
+
+### Key Features
+
+- **Square-root voting power**: Prevents plutocracy - large holders get diminishing returns
+- **Multiple proposal types**: Parameter changes, protocol upgrades, constitutional amendments, emergency actions, signal proposals
+- **Quorum requirements**: Different thresholds for different proposal types
+- **Vote delegation**: Delegate your voting power to trusted representatives
+- **Guardian system**: Emergency veto capability for critical issues
+
+### Voting Requirements
+
+| Requirement | Amount |
+|-------------|--------|
+| Minimum stake to vote | 100 SHR |
+| Minimum stake to create proposal | 10,000 SHR |
+| Maximum active proposals per user | 3 |
+
+### Voting Thresholds by Proposal Type
+
+| Type | Quorum | Approval | Voting Period |
+|------|--------|----------|---------------|
+| Parameter | 10% | 50% | ~3 days (8,640 blocks) |
+| Protocol | 20% | 66% | ~14 days (40,320 blocks) |
+| Constitutional | 33% | 75% | ~30 days (86,400 blocks) |
+| Signal | 10% | 50% | ~3 days (8,640 blocks) |
+| Emergency | 5% | 66% | ~1 day (2,880 blocks) |
+
+---
+
 ### getgovernanceinfo
 
-Returns governance state.
+Returns comprehensive governance state including voting power statistics and thresholds.
 
 ```bash
 ./shurium-cli getgovernanceinfo
+```
+
+**Example Output:**
+```json
+{
+  "enabled": true,
+  "votingEnabled": true,
+  "currentHeight": 601,
+  "totalVotingPower": 108166,
+  "voterCount": 1,
+  "totalProposals": 1,
+  "activeProposals": 1,
+  "activeDelegations": 0,
+  "minProposalStake": 10000,
+  "minVotingStake": 100,
+  "maxActiveProposalsPerUser": 3,
+  "thresholds": {
+    "parameterQuorum": 10,
+    "parameterApproval": 50,
+    "protocolQuorum": 20,
+    "protocolApproval": 66,
+    "constitutionalQuorum": 33,
+    "constitutionalApproval": 75
+  },
+  "votingPeriods": {
+    "parameterVotingPeriod": 8640,
+    "protocolVotingPeriod": 40320,
+    "constitutionalVotingPeriod": 86400
+  }
+}
 ```
 
 ---
 
 ### listproposals
 
-Lists governance proposals.
+Lists governance proposals filtered by status.
 
 ```bash
 ./shurium-cli listproposals [status]
@@ -1634,83 +1694,260 @@ Lists governance proposals.
 
 | Status | Description |
 |--------|-------------|
-| voting | Currently voting |
-| passed | Approved |
-| rejected | Failed |
-| all | All proposals |
+| `pending` | Submitted but voting not yet started |
+| `active` | Currently in voting period |
+| `approved` | Passed and awaiting execution |
+| `executed` | Successfully executed |
+| `rejected` | Failed to meet requirements |
+| `expired` | Voting period ended without quorum |
+| `all` | All proposals (default) |
+
+**Example:**
+```bash
+# List all active proposals
+./shurium-cli listproposals "active"
+
+# List all proposals
+./shurium-cli listproposals "all"
+```
 
 ---
 
 ### getproposal
 
-Returns proposal details.
+Returns detailed information about a specific proposal.
 
 ```bash
 ./shurium-cli getproposal "PROPOSAL_ID"
+```
+
+**Example Output:**
+```json
+{
+  "proposalId": "ffd0e191084e29d9efe535572c02729c177ed4c99421d46e1f4397b6a0221c4e",
+  "type": "signal",
+  "title": "Complete Voting Test",
+  "description": "Full end-to-end voting test",
+  "status": "active",
+  "submitHeight": 600,
+  "votingStartHeight": 601,
+  "votingEndHeight": 9241,
+  "currentHeight": 601,
+  "deposit": 10000,
+  "totalVotingPower": 108166,
+  "votes": {
+    "yes": 108166,
+    "no": 0,
+    "abstain": 0,
+    "veto": 0,
+    "total": 108166
+  },
+  "progress": {
+    "approvalPercent": 100,
+    "approvalRequired": 50,
+    "hasApproval": true,
+    "participationPercent": 100,
+    "quorumRequired": 10,
+    "hasQuorum": true,
+    "isVetoed": false
+  },
+  "isVotingActive": true,
+  "isReadyForExecution": false
+}
 ```
 
 ---
 
 ### createproposal
 
-Creates new proposal.
+Creates a new governance proposal. Requires minimum deposit of 10,000 SHR.
 
 ```bash
 ./shurium-cli createproposal TYPE "TITLE" "DESCRIPTION" DEPOSIT
 ```
 
-| Type | Description |
-|------|-------------|
-| parameter | Change network parameter |
-| upgrade | Software upgrade |
-| treasury | Spend from treasury |
-| text | Non-binding proposal |
+| Type | Description | Use Case |
+|------|-------------|----------|
+| `signal` | Non-binding community poll | Gauge community sentiment |
+| `parameter` | Change network parameters | Adjust fees, block size, etc. |
+| `protocol` | Protocol upgrade proposal | Software upgrades, new features |
+| `constitutional` | Fundamental rule changes | Core governance changes |
+| `emergency` | Urgent action required | Security responses |
 
-**Example:**
+**Examples:**
 ```bash
-./shurium-cli createproposal parameter "Increase Block Size" "Proposal to increase max block size" 1000
+# Create a signal proposal
+./shurium-cli createproposal signal "Increase Block Size" "Proposal to increase max block size for better scalability" 10000
+
+# Create a parameter change proposal
+./shurium-cli createproposal parameter "Lower Minimum Fee" "Reduce MinTransactionFee from 1000 to 500" 10000
+```
+
+**Response:**
+```json
+{
+  "proposalId": "ffd0e191084e29d9efe535572c02729c177ed4c99421d46e1f4397b6a0221c4e",
+  "type": "signal",
+  "title": "Increase Block Size",
+  "status": "pending",
+  "submitHeight": 600,
+  "votingStartHeight": 601,
+  "votingEndHeight": 9241,
+  "deposit": 10000
+}
 ```
 
 ---
 
 ### vote
 
-Votes on proposal.
+Cast your vote on an active proposal. Your voting power is automatically calculated based on your wallet balance using square-root scaling.
 
 ```bash
-./shurium-cli vote "PROPOSAL_ID" OPTION
+./shurium-cli vote "PROPOSAL_ID" CHOICE ["REASON"]
 ```
 
-| Option | Description |
+| Choice | Description |
 |--------|-------------|
-| yes | Support |
-| no | Oppose |
-| abstain | No opinion |
-| veto | Strong opposition |
+| `yes` | Support the proposal |
+| `no` | Oppose the proposal |
+| `abstain` | No opinion (counts toward quorum) |
+| `veto` | Strong opposition (>33% vetoes = rejected) |
 
-**Example:**
+**Examples:**
 ```bash
-./shurium-cli vote "prop123" yes
+# Vote yes with a reason
+./shurium-cli vote "ffd0e191..." yes "I support better scalability"
+
+# Vote no
+./shurium-cli vote "ffd0e191..." no
+
+# Abstain (still counts toward quorum)
+./shurium-cli vote "ffd0e191..." abstain
 ```
+
+**Response:**
+```json
+{
+  "success": true,
+  "proposalId": "ffd0e191...",
+  "voter": "347261676e6568366b6e6c6b3765657131726873",
+  "choice": "yes",
+  "votingPower": 108166,
+  "voteHeight": 601,
+  "currentApprovalPercent": 100,
+  "currentParticipationPercent": 100
+}
+```
+
+**Note:** Your voting power is calculated as `sqrt(balance) * 1000`. This means:
+- 100 SHR = 10,000 voting power
+- 10,000 SHR = 100,000 voting power
+- 1,000,000 SHR = 1,000,000 voting power
 
 ---
 
 ### getvoteinfo
 
-Returns vote information.
+Returns vote information for a proposal, optionally for a specific voter.
 
 ```bash
-./shurium-cli getvoteinfo "PROPOSAL_ID"
+./shurium-cli getvoteinfo "PROPOSAL_ID" ["VOTER_ID"]
+```
+
+**Example:**
+```bash
+# Get overall vote info
+./shurium-cli getvoteinfo "ffd0e191..."
+
+# Get specific voter's vote
+./shurium-cli getvoteinfo "ffd0e191..." "347261676e6568366b6e6c6b3765657131726873"
 ```
 
 ---
 
 ### listparameters
 
-Lists governance parameters.
+Lists all governable parameters with their current values and constraints.
 
 ```bash
 ./shurium-cli listparameters
+```
+
+**Example Output (partial):**
+```json
+[
+  {
+    "name": "TransactionFeeMultiplier",
+    "value": 100,
+    "type": "integer",
+    "modifiable": true,
+    "description": "Fee multiplier (100 = 1x)"
+  },
+  {
+    "name": "BlockSizeLimit",
+    "value": 4194304,
+    "type": "integer",
+    "modifiable": true,
+    "description": "Maximum block size in bytes (4MB)"
+  },
+  {
+    "name": "UBIDistributionRate",
+    "value": 1000,
+    "type": "integer",
+    "modifiable": true,
+    "description": "UBI rate in basis points (1000 = 10%)"
+  }
+]
+```
+
+### Governable Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `TransactionFeeMultiplier` | 100 | Fee multiplier (100 = 1x) |
+| `BlockSizeLimit` | 4,194,304 | Max block size (4MB) |
+| `MinTransactionFee` | 1,000 | Minimum tx fee in base units |
+| `BlockRewardAdjustment` | 100 | Block reward adjustment (bps) |
+| `UBIDistributionRate` | 1,000 | UBI rate (bps, 10%) |
+| `OracleMinStake` | 10,000 SHR | Minimum oracle stake |
+| `OracleSlashingRate` | 500 | Oracle slashing (bps, 5%) |
+| `TreasuryAllocationDev` | 30 | Dev treasury (30%) |
+| `TreasuryAllocationSecurity` | 15 | Security treasury (15%) |
+| `TreasuryAllocationMarketing` | 10 | Marketing treasury (10%) |
+| `StabilityFeeRate` | 50 | Stability fee (bps, 0.5%) |
+| `PriceDeviationThreshold` | 500 | Price deviation (bps, 5%) |
+| `ProposalDepositAmount` | 1,000 SHR | Proposal deposit |
+| `VotingPeriodBlocks` | 8,640 | Default voting period |
+
+---
+
+### Complete Governance Workflow Example
+
+```bash
+# 1. Check your balance (need 100+ SHR to vote, 10,000+ to propose)
+./shurium-cli getbalance
+
+# 2. View current governance state
+./shurium-cli getgovernanceinfo
+
+# 3. List governable parameters
+./shurium-cli listparameters
+
+# 4. Create a signal proposal
+./shurium-cli createproposal signal "Lower Transaction Fees" "Proposal to reduce minimum transaction fee from 1000 to 500 base units" 10000
+
+# 5. Wait one block for voting to start
+./shurium-cli generatetoaddress 1 "YOUR_ADDRESS"
+
+# 6. Vote on the proposal
+./shurium-cli vote "PROPOSAL_ID" yes "Lower fees will increase adoption"
+
+# 7. Check proposal status
+./shurium-cli getproposal "PROPOSAL_ID"
+
+# 8. List all active proposals
+./shurium-cli listproposals "active"
 ```
 
 ---

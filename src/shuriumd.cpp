@@ -23,6 +23,7 @@
 #include <shurium/economics/ubi.h>
 #include <shurium/economics/reward.h>
 #include <shurium/identity/identity.h>
+#include <shurium/governance/governance.h>
 
 #include <atomic>
 #include <chrono>
@@ -179,6 +180,7 @@ static std::unique_ptr<staking::StakingEngine> g_stakingEngine;
 static std::shared_ptr<identity::IdentityManager> g_identityManager;
 static std::shared_ptr<economics::UBIDistributor> g_ubiDistributor;
 static std::unique_ptr<economics::RewardCalculator> g_rewardCalculator;
+static std::shared_ptr<governance::GovernanceEngine> g_governanceEngine;
 
 // ============================================================================
 // Signal Handling
@@ -1251,6 +1253,16 @@ int AppMain(int argc, char* argv[]) {
         LOG_WARN(util::LogCategory::DEFAULT) << "UBI distributor not initialized - node params not available";
     }
     
+    // Initialize governance engine
+    auto paramRegistry = std::make_shared<governance::ParameterRegistry>();
+    g_governanceEngine = std::make_shared<governance::GovernanceEngine>(paramRegistry);
+    LOG_INFO(util::LogCategory::DEFAULT) << "Governance engine initialized";
+    
+    // Wire up governance engine to RPC commands
+    if (g_rpcCommands) {
+        g_rpcCommands->SetGovernanceEngine(g_governanceEngine);
+    }
+    
     // Initialize miner (create even if not starting, for setgenerate support)
     // Get mining address (from config or wallet)
     Hash160 miningAddress;
@@ -1325,6 +1337,11 @@ int AppMain(int argc, char* argv[]) {
                 if (g_ubiDistributor && g_rewardCalculator) {
                     Amount ubiAmount = g_rewardCalculator->GetUBIPoolAmount(height);
                     g_ubiDistributor->AddBlockReward(height, ubiAmount);
+                }
+                
+                // Process governance proposals (advance state, execute approved)
+                if (g_governanceEngine) {
+                    g_governanceEngine->ProcessBlock(height);
                 }
                 
                 // Notify wallet about the new block so it can track coinbase outputs
