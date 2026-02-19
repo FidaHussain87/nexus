@@ -765,6 +765,7 @@ When you mine a block, here's what happens:
 | `./shurium-cli getfundinfo` | View all fund details |
 | `./shurium-cli getfundbalance FUND` | Check specific fund balance |
 | `./shurium-cli setfundaddress FUND ADDRESS` | Configure fund address |
+| `./shurium-cli sendfrom FROM TO AMOUNT` | Send from specific fund address |
 | `./shurium-cli getblockchaininfo` | Network status |
 | `./shurium-cli getpeerinfo` | Connected nodes |
 | `./shurium-cli getmininginfo` | Mining statistics |

@@ -26,6 +26,7 @@
 #include <shurium/marketplace/verifier.h>
 #include <shurium/node/context.h>
 #include <shurium/util/logging.h>
+#include <shurium/script/interpreter.h>
 
 #include <shurium/rpc/commands.h>
 #include <shurium/rpc/server.h>
@@ -64,7 +65,8 @@ static std::string JoinWalletPath(const std::string& dir, const std::string& fil
 
 Amount ParseAmount(const JSONValue& value) {
     if (value.IsInt()) {
-        return value.GetInt();
+        // Integers are treated as whole coins (multiply by COIN)
+        return static_cast<Amount>(value.GetInt()) * COIN;
     }
     if (value.IsDouble()) {
         double d = value.GetDouble();
@@ -753,6 +755,18 @@ void RPCCommandTable::RegisterWalletCommands() {
         true, true,
         {"amounts"},
         {"A JSON object with addresses and amounts"}
+    });
+    
+    commands_.push_back({
+        "sendfrom",
+        Category::WALLET,
+        "Send from a specific address to another address.",
+        [table](const RPCRequest& req, const RPCContext& ctx) {
+            return cmd_sendfrom(req, ctx, table);
+        },
+        true, true,
+        {"from_address", "to_address", "amount", "comment"},
+        {"The source address", "The destination address", "The amount to send", "A comment (optional)"}
     });
     
     commands_.push_back({
@@ -3009,6 +3023,185 @@ RPCResponse cmd_sendmany(const RPCRequest& req, const RPCContext& ctx,
         if (mempool) {
             std::string errString;
             if (!mempool->AddTx(std::make_shared<Transaction>(tx), result.fee, 
+                               wallet->GetChainHeight(), false, errString)) {
+                return RPCResponse::Error(-25, "Transaction rejected: " + errString, req.GetId());
+            }
+        }
+        
+        // Process in wallet
+        wallet->ProcessTransaction(std::make_shared<Transaction>(tx));
+        
+        // Return txid
+        std::string txid = HashToHex(tx.GetHash());
+        return RPCResponse::Success(JSONValue(txid), req.GetId());
+    } catch (const std::exception& e) {
+        return InvalidParams(e.what(), req.GetId());
+    }
+}
+
+RPCResponse cmd_sendfrom(const RPCRequest& req, const RPCContext& ctx,
+                         RPCCommandTable* table) {
+    wallet::Wallet* wallet = table->GetWallet();
+    if (!wallet) {
+        return RPCResponse::Error(ErrorCode::WALLET_NOT_FOUND, "Wallet not loaded", req.GetId());
+    }
+    
+    if (wallet->IsLocked()) {
+        return RPCResponse::Error(ErrorCode::WALLET_UNLOCK_NEEDED, 
+                                 "Wallet is locked. Unlock first with walletpassphrase.", req.GetId());
+    }
+    
+    try {
+        std::string fromAddress = GetRequiredParam<std::string>(req, size_t(0));
+        std::string toAddress = GetRequiredParam<std::string>(req, size_t(1));
+        Amount amount = ParseAmount(req.GetParam(size_t(2)));
+        std::string comment = GetOptionalParam<std::string>(req, size_t(3), "");
+        
+        // Validate from address
+        if (!ValidateAddress(fromAddress)) {
+            return InvalidParams("Invalid from address", req.GetId());
+        }
+        
+        // Validate to address
+        if (!ValidateAddress(toAddress)) {
+            return InvalidParams("Invalid to address", req.GetId());
+        }
+        
+        if (amount <= 0) {
+            return InvalidParams("Amount must be positive", req.GetId());
+        }
+        
+        // Decode the from address to get the keyHash
+        auto fromScriptData = DecodeAddress(fromAddress);
+        if (fromScriptData.empty()) {
+            return InvalidParams("Failed to decode from address", req.GetId());
+        }
+        
+        // Extract keyHash from the script (P2WPKH format: OP_0 <20-byte-hash>)
+        Hash160 fromKeyHash;
+        if (fromScriptData.size() >= 22 && fromScriptData[0] == 0x00 && fromScriptData[1] == 0x14) {
+            // P2WPKH: OP_0 PUSH20 <hash160>
+            std::copy(fromScriptData.begin() + 2, fromScriptData.begin() + 22, fromKeyHash.begin());
+        } else if (fromScriptData.size() >= 25) {
+            // P2PKH: OP_DUP OP_HASH160 PUSH20 <hash160> OP_EQUALVERIFY OP_CHECKSIG
+            std::copy(fromScriptData.begin() + 3, fromScriptData.begin() + 23, fromKeyHash.begin());
+        } else {
+            return InvalidParams("Unsupported from address type", req.GetId());
+        }
+        
+        // Get spendable outputs filtered by the from address
+        auto allOutputs = wallet->GetSpendableOutputs();
+        std::vector<wallet::WalletOutput> filteredOutputs;
+        Amount availableFromAddress = 0;
+        
+        for (const auto& output : allOutputs) {
+            if (output.keyHash == fromKeyHash) {
+                filteredOutputs.push_back(output);
+                availableFromAddress += output.GetValue();
+            }
+        }
+        
+        if (filteredOutputs.empty()) {
+            return RPCResponse::Error(-6, "No funds available at the specified from address", req.GetId());
+        }
+        
+        if (availableFromAddress < amount) {
+            std::string errMsg = "Insufficient funds at from address. Available: " + 
+                                std::to_string(static_cast<double>(availableFromAddress) / 100000000.0) + " SHR";
+            return RPCResponse::Error(-6, errMsg, req.GetId());
+        }
+        
+        // Build transaction manually using only outputs from the specified address
+        MutableTransaction mtx;
+        mtx.version = 2;
+        mtx.nLockTime = 0;
+        
+        // Select inputs from filtered outputs (simple greedy selection)
+        Amount inputTotal = 0;
+        Amount estimatedFee = 1000; // Base fee estimate
+        Amount targetAmount = amount + estimatedFee;
+        
+        // Sort by amount descending for efficient selection
+        std::sort(filteredOutputs.begin(), filteredOutputs.end(),
+                  [](const wallet::WalletOutput& a, const wallet::WalletOutput& b) {
+                      return a.GetValue() > b.GetValue();
+                  });
+        
+        std::vector<wallet::WalletOutput> selectedOutputs;
+        for (const auto& output : filteredOutputs) {
+            if (inputTotal >= targetAmount) break;
+            
+            TxIn input;
+            input.prevout = output.outpoint;
+            input.nSequence = 0xFFFFFFFE; // Enable RBF
+            mtx.vin.push_back(input);
+            
+            selectedOutputs.push_back(output);
+            inputTotal += output.GetValue();
+            
+            // Update fee estimate based on input count
+            estimatedFee = 1000 + (mtx.vin.size() * 150); // ~150 bytes per input
+            targetAmount = amount + estimatedFee;
+        }
+        
+        if (inputTotal < amount + estimatedFee) {
+            return RPCResponse::Error(-6, "Insufficient funds after accounting for fee", req.GetId());
+        }
+        
+        // Create destination output
+        auto toScriptData = DecodeAddress(toAddress);
+        Script destScript(toScriptData.begin(), toScriptData.end());
+        mtx.vout.push_back(TxOut(amount, destScript));
+        
+        // Create change output back to the from address (if there's change)
+        Amount change = inputTotal - amount - estimatedFee;
+        if (change > 546) { // Dust threshold
+            Script changeScript(fromScriptData.begin(), fromScriptData.end());
+            mtx.vout.push_back(TxOut(change, changeScript));
+        }
+        
+        // Sign the transaction
+        // For each input, sign with the appropriate key
+        Transaction txForSig(mtx);
+        
+        for (size_t i = 0; i < mtx.vin.size(); ++i) {
+            const auto& prevOut = selectedOutputs[i];
+            
+            // Get the key for this output
+            auto key = wallet->GetKeyStore()->GetKey(prevOut.keyHash);
+            if (!key) {
+                return RPCResponse::Error(-4, "Cannot sign: key not found for input " + std::to_string(i), req.GetId());
+            }
+            
+            // Compute signature hash
+            const Script& scriptCode = prevOut.txout.scriptPubKey;
+            constexpr uint8_t nHashType = SIGHASH_ALL;
+            Hash256 sigHash = SignatureHash(txForSig, static_cast<unsigned int>(i), scriptCode, nHashType);
+            
+            // Sign
+            auto signature = key->Sign(sigHash);
+            if (signature.empty()) {
+                return RPCResponse::Error(-4, "Signing failed for input " + std::to_string(i), req.GetId());
+            }
+            
+            // Append SIGHASH type
+            signature.push_back(nHashType);
+            
+            // Build scriptSig
+            Script scriptSig;
+            scriptSig << signature;
+            scriptSig << key->GetPublicKey().ToVector();
+            mtx.vin[i].scriptSig = scriptSig;
+        }
+        
+        // Convert to final transaction
+        Transaction tx(mtx);
+        
+        // Broadcast to mempool
+        Mempool* mempool = table->GetMempool();
+        if (mempool) {
+            std::string errString;
+            if (!mempool->AddTx(std::make_shared<Transaction>(tx), estimatedFee, 
                                wallet->GetChainHeight(), false, errString)) {
                 return RPCResponse::Error(-25, "Transaction rejected: " + errString, req.GetId());
             }

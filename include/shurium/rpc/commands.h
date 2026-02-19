@@ -298,6 +298,10 @@ RPCResponse cmd_sendtoaddress(const RPCRequest& req, const RPCContext& ctx,
 RPCResponse cmd_sendmany(const RPCRequest& req, const RPCContext& ctx,
                          RPCCommandTable* table);
 
+/// Send from specific address
+RPCResponse cmd_sendfrom(const RPCRequest& req, const RPCContext& ctx,
+                         RPCCommandTable* table);
+
 /// List transactions
 RPCResponse cmd_listtransactions(const RPCRequest& req, const RPCContext& ctx,
                                  RPCCommandTable* table);

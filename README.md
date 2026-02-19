@@ -180,6 +180,7 @@ sleep 3
 | Check balance | `./shurium-cli --regtest getbalance` | `./shurium-cli getbalance` |
 | New address | `./shurium-cli --regtest getnewaddress` | `./shurium-cli getnewaddress` |
 | Send coins | `./shurium-cli --regtest sendtoaddress <addr> <amount>` | `./shurium-cli sendtoaddress <addr> <amount>` |
+| Send from address | `./shurium-cli --regtest sendfrom <from> <to> <amt>` | `./shurium-cli sendfrom <from> <to> <amt>` |
 | Mine blocks | `./shurium-cli --regtest generatetoaddress <n> <addr>` | N/A (use miner) |
 | Wallet info | `./shurium-cli --regtest getwalletinfo` | `./shurium-cli getwalletinfo` |
 | Blockchain info | `./shurium-cli --regtest getblockchaininfo` | `./shurium-cli getblockchaininfo` |

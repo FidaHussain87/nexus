@@ -12,7 +12,7 @@
 | [Wallet Tool](#wallet-tool-shurium-wallet-tool) | create, import, restore, backup wallets |
 | [Blockchain](#-blockchain-commands) | getblockchaininfo, getblock, getblockhash... |
 | [Network](#-network-commands) | getnetworkinfo, getpeerinfo, addnode... |
-| [Wallet](#-wallet-commands) | getbalance, sendtoaddress, getnewaddress... |
+| [Wallet](#-wallet-commands) | getbalance, sendtoaddress, sendfrom, getnewaddress... |
 | [Mining](#️-mining-commands) | getmininginfo, setgenerate, getwork... |
 | [Fund Management](#-fund-management-commands) | getfundinfo, getfundbalance, getfundaddress... |
 | [Staking](#-staking-commands) | getstakinginfo, delegate, createvalidator... |
@@ -671,6 +671,43 @@ Sends to multiple addresses.
 ```bash
 ./shurium-cli sendmany "" '{"shr1qa...":10,"shr1qb...":20}'
 ```
+
+---
+
+### sendfrom
+
+Sends coins from a specific address to another address. Unlike `sendtoaddress` which picks UTXOs from any address in the wallet, `sendfrom` only uses coins from the specified source address.
+
+```bash
+./shurium-cli sendfrom "FROM_ADDRESS" "TO_ADDRESS" AMOUNT [comment]
+```
+
+**Arguments:**
+| Argument | Type | Description |
+|----------|------|-------------|
+| from_address | string | The source address (must be in your wallet) |
+| to_address | string | The destination address |
+| amount | numeric | The amount to send (in SHR) |
+| comment | string | Optional comment for the transaction |
+
+**Example:**
+```bash
+# Transfer 50 SHR from mining address to savings address
+./shurium-cli sendfrom "shr1qmining..." "shr1qsavings..." 50 "Monthly savings"
+
+# Transfer from UBI fund to recipient
+./shurium-cli sendfrom "shr1qubifund..." "shr1qrecipient..." 100 "UBI distribution"
+```
+
+**Use Cases:**
+- **Fund Management**: Spend from specific fund addresses (UBI, Contribution, etc.)
+- **Accounting**: Track spending per address for organizational transparency
+- **Segregated Wallets**: Keep funds organized by purpose
+
+**Notes:**
+- Returns change to the source address (not a random wallet address)
+- Fails if the source address has insufficient funds
+- Transaction fee is deducted from the source address balance
 
 ---
 
@@ -2126,6 +2163,7 @@ Returns various state info. Use specific commands instead.
 |------|---------|
 | Check balance | `getbalance` |
 | Send coins | `sendtoaddress "addr" amount` |
+| Send from address | `sendfrom "from" "to" amount` |
 | New address | `getnewaddress "label"` |
 | Unlock wallet | `walletpassphrase "pass" 300` |
 | Start mining | `setgenerate true 4` |

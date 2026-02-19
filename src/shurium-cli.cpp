@@ -683,6 +683,7 @@ int HandleBuiltinCommand(const CLIConfig& config) {
         std::cout << "getnewaddress            Generates new address\n";
         std::cout << "listaddresses            Lists wallet addresses\n";
         std::cout << "sendtoaddress <addr> <amt>  Send to address\n";
+        std::cout << "sendfrom <from> <to> <amt>  Send from specific address\n";
         std::cout << "listtransactions         Lists wallet transactions\n";
         std::cout << "listunspent              Lists unspent outputs\n";
         std::cout << "signmessage <addr> <msg> Sign a message\n";
