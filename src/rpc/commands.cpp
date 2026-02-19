@@ -4223,10 +4223,17 @@ RPCResponse cmd_getidentitystatus(const RPCRequest& req, const RPCContext& ctx,
         if (record) {
             result["exists"] = true;
             result["status"] = IdentityStatusStr(record->status);
+            result["verificationLevel"] = identity::VerificationLevelToString(record->verificationLevel);
+            result["verificationLevelNum"] = static_cast<int>(record->verificationLevel);
             result["isActive"] = record->IsActive();
             result["canClaimUBI"] = record->CanClaimUBI(idMgr->GetCurrentEpoch());
             result["treeIndex"] = static_cast<int64_t>(record->treeIndex);
             result["registrationHeight"] = static_cast<int64_t>(record->registrationHeight);
+            
+            // Add verifier info if verified
+            if (record->verificationLevel != identity::VerificationLevel::None) {
+                result["verifierId"] = FormatHex(record->verifierId.data(), record->verifierId.size());
+            }
             
             // Get identity statistics
             auto stats = idMgr->GetStats();

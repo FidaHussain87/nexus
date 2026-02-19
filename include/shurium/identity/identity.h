@@ -54,6 +54,30 @@ enum class IdentityStatus {
     Expired
 };
 
+/// Verification level for an identity
+enum class VerificationLevel {
+    /// No verification - self-attested only
+    None = 0,
+    
+    /// Basic verification - passed automated checks
+    Basic = 1,
+    
+    /// Standard verification - verified by one trusted verifier
+    Standard = 2,
+    
+    /// Enhanced verification - verified by multiple verifiers
+    Enhanced = 3,
+    
+    /// Maximum verification - full KYC by trusted authority
+    Maximum = 4
+};
+
+/// Get string representation of verification level
+const char* VerificationLevelToString(VerificationLevel level);
+
+/// Parse verification level from string
+std::optional<VerificationLevel> VerificationLevelFromString(const std::string& str);
+
 // ============================================================================
 // Identity Secrets (User's private data)
 // ============================================================================
@@ -128,6 +152,9 @@ struct IdentityRecord {
     /// Current status
     IdentityStatus status;
     
+    /// Verification level (determines UBI multiplier)
+    VerificationLevel verificationLevel;
+    
     /// Block height when registered
     uint32_t registrationHeight;
     
@@ -142,6 +169,9 @@ struct IdentityRecord {
     
     /// Registration timestamp
     int64_t registrationTime;
+    
+    /// Verifier ID who verified this identity (0 = self-attested)
+    Hash256 verifierId;
     
     /// Create a new identity record
     static IdentityRecord Create(const IdentityCommitment& commitment,

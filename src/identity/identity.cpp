@@ -16,6 +16,30 @@ namespace shurium {
 namespace identity {
 
 // ============================================================================
+// Verification Level Functions
+// ============================================================================
+
+const char* VerificationLevelToString(VerificationLevel level) {
+    switch (level) {
+        case VerificationLevel::None: return "none";
+        case VerificationLevel::Basic: return "basic";
+        case VerificationLevel::Standard: return "standard";
+        case VerificationLevel::Enhanced: return "enhanced";
+        case VerificationLevel::Maximum: return "maximum";
+        default: return "unknown";
+    }
+}
+
+std::optional<VerificationLevel> VerificationLevelFromString(const std::string& str) {
+    if (str == "none" || str == "0") return VerificationLevel::None;
+    if (str == "basic" || str == "1") return VerificationLevel::Basic;
+    if (str == "standard" || str == "2") return VerificationLevel::Standard;
+    if (str == "enhanced" || str == "3") return VerificationLevel::Enhanced;
+    if (str == "maximum" || str == "4") return VerificationLevel::Maximum;
+    return std::nullopt;
+}
+
+// ============================================================================
 // IdentitySecrets
 // ============================================================================
 
@@ -214,11 +238,13 @@ IdentityRecord IdentityRecord::Create(const IdentityCommitment& commitment,
     record.commitment = commitment;
     record.id = ComputeIdentityId(commitment);
     record.status = IdentityStatus::Pending;
+    record.verificationLevel = VerificationLevel::None;  // Self-attested initially
     record.registrationHeight = height;
     record.lastUpdateHeight = height;
     record.expirationHeight = 0;  // Never expires by default
     record.treeIndex = 0;  // Set during registration
     record.registrationTime = timestamp;
+    std::memset(record.verifierId.data(), 0, 32);  // No verifier initially
     return record;
 }
 
@@ -236,7 +262,7 @@ bool IdentityRecord::CanClaimUBI(uint32_t currentHeight) const {
 
 std::vector<Byte> IdentityRecord::ToBytes() const {
     std::vector<Byte> result;
-    result.reserve(128);
+    result.reserve(162);  // Increased for new fields
     
     // ID (32 bytes)
     result.insert(result.end(), id.begin(), id.end());
@@ -247,6 +273,9 @@ std::vector<Byte> IdentityRecord::ToBytes() const {
     
     // Status (1 byte)
     result.push_back(static_cast<Byte>(status));
+    
+    // Verification level (1 byte)
+    result.push_back(static_cast<Byte>(verificationLevel));
     
     // Heights (4 bytes each)
     for (int i = 0; i < 4; ++i) {
@@ -269,15 +298,21 @@ std::vector<Byte> IdentityRecord::ToBytes() const {
         result.push_back(static_cast<Byte>((registrationTime >> (i * 8)) & 0xFF));
     }
     
+    // Verifier ID (32 bytes)
+    result.insert(result.end(), verifierId.begin(), verifierId.end());
+    
     return result;
 }
 
 std::optional<IdentityRecord> IdentityRecord::FromBytes(const Byte* data, size_t len) {
-    if (len < 97) {  // 32 + 32 + 1 + 12 + 8 + 8 + 4 = 97
+    // Minimum size: 32 + 32 + 1 + 1 + 12 + 8 + 8 + 32 = 126 bytes
+    // Support both old (97 bytes) and new (130+ bytes) format for backwards compatibility
+    if (len < 97) {
         return std::nullopt;
     }
     
     IdentityRecord record;
+    const Byte* start = data;
     
     // ID
     std::copy(data, data + 32, record.id.begin());
@@ -292,6 +327,17 @@ std::optional<IdentityRecord> IdentityRecord::FromBytes(const Byte* data, size_t
     // Status
     record.status = static_cast<IdentityStatus>(data[0]);
     data++;
+    
+    // Check if we have the new format with verification level
+    size_t remaining = len - static_cast<size_t>(data - start);
+    if (remaining >= 33 + 12 + 8 + 8) {  // New format with verificationLevel + verifierId
+        // Verification level (new field)
+        record.verificationLevel = static_cast<VerificationLevel>(data[0]);
+        data++;
+    } else {
+        // Old format - default to None
+        record.verificationLevel = VerificationLevel::None;
+    }
     
     // Heights
     record.registrationHeight = 0;
@@ -323,6 +369,15 @@ std::optional<IdentityRecord> IdentityRecord::FromBytes(const Byte* data, size_t
     record.registrationTime = 0;
     for (int i = 0; i < 8; ++i) {
         record.registrationTime |= static_cast<int64_t>(data[i]) << (i * 8);
+    }
+    data += 8;
+    
+    // Verifier ID (new field - check if present)
+    remaining = len - static_cast<size_t>(data - start);
+    if (remaining >= 32) {
+        std::copy(data, data + 32, record.verifierId.begin());
+    } else {
+        std::memset(record.verifierId.data(), 0, 32);
     }
     
     return record;
