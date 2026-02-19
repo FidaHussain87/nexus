@@ -2775,6 +2775,51 @@ Returns various state info. Use specific commands instead.
 
 ---
 
+### getfaucet (testnet/regtest only)
+
+Request test coins from the faucet. Only available on testnet and regtest networks.
+
+```bash
+./shurium-cli --testnet getfaucet "ADDRESS" [AMOUNT]
+```
+
+**Arguments:**
+| # | Name | Type | Required | Description |
+|---|------|------|----------|-------------|
+| 1 | address | string | Yes | Address to receive test coins |
+| 2 | amount | number | No | Amount of SHR (default: 100, max: 1000) |
+
+**Example:**
+```bash
+# Request 100 SHR (default)
+./shurium-cli --testnet getfaucet "tshr1qxyz..."
+
+# Request specific amount
+./shurium-cli --testnet getfaucet "tshr1qxyz..." 500
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "txid": "abc123...",
+  "address": "tshr1qxyz...",
+  "amount": 100.00000000,
+  "fee": 0.00484000,
+  "network": "testnet",
+  "message": "Test coins sent! Transaction will be confirmed in the next block.",
+  "hint": "Transaction will be confirmed by the network within ~30 seconds."
+}
+```
+
+**Notes:**
+- Only works on testnet (`--testnet`) or regtest (`--regtest`)
+- Maximum 1,000 SHR per request
+- Faucet wallet must have sufficient balance
+- On regtest, generate a block to confirm: `generatetoaddress 1 <addr>`
+
+---
+
 ## 📊 Quick Reference Tables
 
 ### Most Common Commands

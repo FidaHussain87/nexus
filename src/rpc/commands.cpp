@@ -60,6 +60,14 @@ static std::string JoinWalletPath(const std::string& dir, const std::string& fil
 }
 
 // ============================================================================
+// Forward Declarations
+// ============================================================================
+
+// Forward declaration for faucet command (defined at end of file)
+RPCResponse cmd_getfaucet(const RPCRequest& req, const RPCContext& ctx,
+                          RPCCommandTable* table);
+
+// ============================================================================
 // Helper Functions Implementation
 // ============================================================================
 
@@ -1662,6 +1670,25 @@ void RPCCommandTable::RegisterUtilityCommands() {
         false, false,
         {"fundtype", "address"},
         {"Fund type (ubi, contribution, ecosystem, stability)", "Address to receive fund rewards"}
+    });
+    
+    // ========================================================================
+    // Testnet Faucet Command
+    // ========================================================================
+    
+    commands_.push_back({
+        "getfaucet",
+        Category::UTILITY,
+        "Request testnet coins from the faucet (testnet/regtest only).\n"
+        "Arguments:\n"
+        "1. address  (string, required) Address to receive coins\n"
+        "2. amount   (numeric, optional, default=100) Amount of SHR to send (max 1000)",
+        [table](const RPCRequest& req, const RPCContext& ctx) {
+            return cmd_getfaucet(req, ctx, table);
+        },
+        false, false,
+        {"address", "amount"},
+        {"Address to receive coins", "Amount of SHR (default=100, max=1000)"}
     });
 }
 
@@ -7937,6 +7964,116 @@ RPCResponse cmd_setfundaddress(const RPCRequest& req, const RPCContext& ctx,
                         std::string(fundTypeStr) + "address=" + address;
     
     return RPCResponse::Success(result, req.GetId());
+}
+
+// ============================================================================
+// Testnet Faucet Implementation
+// ============================================================================
+
+/**
+ * Get testnet/regtest coins from faucet.
+ * This command is only available on testnet and regtest networks.
+ * It allows users to easily get test coins for development and testing.
+ */
+RPCResponse cmd_getfaucet(const RPCRequest& req, const RPCContext& ctx,
+                          RPCCommandTable* table) {
+    (void)ctx;
+    
+    // Verify we're on testnet or regtest using wallet config
+    auto* wallet = table->GetWallet();
+    if (!wallet) {
+        return InternalError("Wallet not available", req.GetId());
+    }
+    
+    // For now, allow on any network but warn on mainnet
+    // In production, check wallet->GetConfig().testnet
+    bool isTestMode = wallet->GetConfig().testnet;
+    
+    // Get network info from chain state manager if available
+    std::string networkId = "unknown";
+    auto* chainMgr = table->GetChainStateManager();
+    if (chainMgr) {
+        networkId = chainMgr->GetParams().strNetworkID;
+        isTestMode = (networkId == "test" || networkId == "regtest");
+    }
+    
+    if (!isTestMode) {
+        return InvalidParams("Faucet is only available on testnet and regtest networks", req.GetId());
+    }
+    
+    // Get address parameter
+    std::string address = GetRequiredParam<std::string>(req, size_t(0));
+    
+    // Validate address format (basic check for SHURIUM bech32 addresses)
+    if (address.length() < 10 || 
+        (address.substr(0, 4) != "shr1" && 
+         address.substr(0, 5) != "tshr1" &&  // testnet prefix
+         address.substr(0, 5) != "rshr1")) {  // regtest prefix
+        return InvalidParams("Invalid address format. Expected SHURIUM address (shr1..., tshr1..., or rshr1...)", req.GetId());
+    }
+    
+    // Get amount parameter (default 100 SHR, max 1000 SHR)
+    double amountShr = GetOptionalParam<double>(req, size_t(1), 100.0);
+    
+    // Validate amount
+    if (amountShr <= 0) {
+        return InvalidParams("Amount must be positive", req.GetId());
+    }
+    if (amountShr > 1000) {
+        return InvalidParams("Maximum faucet amount is 1000 SHR per request", req.GetId());
+    }
+    
+    Amount amount = static_cast<Amount>(amountShr * COIN);
+    
+    // Check faucet wallet has sufficient balance
+    wallet::WalletBalance balance = wallet->GetBalance();
+    Amount spendable = balance.GetSpendable();
+    
+    if (spendable < amount) {
+        JSONValue::Object result;
+        result["success"] = false;
+        result["error"] = "Faucet wallet has insufficient balance";
+        result["faucet_balance"] = FormatAmount(spendable);
+        result["requested"] = FormatAmount(amount);
+        result["hint"] = "Generate blocks to fund the faucet: generatetoaddress 101 <faucet_address>";
+        return RPCResponse::Success(JSONValue(std::move(result)), req.GetId());
+    }
+    
+    // Create and send transaction using SendToAddress
+    try {
+        auto buildResult = wallet->SendToAddress(address, amount);
+        
+        if (!buildResult.success) {
+            return InternalError("Failed to create transaction: " + buildResult.error, req.GetId());
+        }
+        
+        // Get the transaction hash
+        Transaction finalTx(buildResult.tx);
+        TxHash txid = finalTx.GetHash();
+        std::string txidHex = FormatHex(txid.data(), txid.size());
+        
+        // Return success response
+        JSONValue::Object result;
+        result["success"] = true;
+        result["txid"] = txidHex;
+        result["address"] = address;
+        result["amount"] = FormatAmount(amount);
+        result["fee"] = FormatAmount(buildResult.fee);
+        result["network"] = networkId;
+        result["message"] = "Test coins sent! Transaction will be confirmed in the next block.";
+        
+        // Add helpful hints
+        if (networkId == "regtest") {
+            result["hint"] = "Generate a block to confirm: generatetoaddress 1 <your_address>";
+        } else {
+            result["hint"] = "Transaction will be confirmed by the network within ~30 seconds.";
+        }
+        
+        return RPCResponse::Success(JSONValue(std::move(result)), req.GetId());
+        
+    } catch (const std::exception& e) {
+        return InternalError(std::string("Faucet error: ") + e.what(), req.GetId());
+    }
 }
 
 } // namespace rpc
