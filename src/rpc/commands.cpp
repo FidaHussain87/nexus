@@ -67,6 +67,10 @@ static std::string JoinWalletPath(const std::string& dir, const std::string& fil
 RPCResponse cmd_getfaucet(const RPCRequest& req, const RPCContext& ctx,
                           RPCCommandTable* table);
 
+// Forward declaration for solver rewards command (defined at end of file)
+RPCResponse cmd_getsolverrewards(const RPCRequest& req, const RPCContext& ctx,
+                                  RPCCommandTable* table);
+
 // ============================================================================
 // Helper Functions Implementation
 // ============================================================================
@@ -1412,13 +1416,17 @@ void RPCCommandTable::RegisterMiningCommands() {
     commands_.push_back({
         "listproblems",
         Category::MINING,
-        "List available PoUW problems.",
+        "List PoUW problems in the marketplace.\n"
+        "Arguments:\n"
+        "1. status  (string, optional) Filter: all, pending, solved, expired (default: pending)\n"
+        "2. type    (string, optional) Filter by problem type\n"
+        "3. count   (number, optional) Maximum results (default: 100, max: 1000)",
         [table](const RPCRequest& req, const RPCContext& ctx) {
             return cmd_listproblems(req, ctx, table);
         },
         false, false,
-        {"status"},
-        {"Filter by status (pending, assigned, solved, all)"}
+        {"status", "type", "count"},
+        {"Filter: all, pending, solved, expired", "Problem type filter", "Maximum results"}
     });
     
     commands_.push_back({
@@ -1463,6 +1471,20 @@ void RPCCommandTable::RegisterMiningCommands() {
         false, false,
         {},
         {}
+    });
+    
+    commands_.push_back({
+        "getsolverrewards",
+        Category::MINING,
+        "Get accumulated rewards for a solver address.\n"
+        "Arguments:\n"
+        "1. address  (string, optional) Solver address (default: wallet address)",
+        [table](const RPCRequest& req, const RPCContext& ctx) {
+            return cmd_getsolverrewards(req, ctx, table);
+        },
+        false, false,
+        {"address"},
+        {"Solver address (optional)"}
     });
     
     commands_.push_back({
@@ -6646,6 +6668,12 @@ RPCResponse cmd_listproblems(const RPCRequest& req, const RPCContext& ctx,
     std::string typeFilter = GetOptionalParam<std::string>(req, size_t(1), "");
     int64_t maxCount = GetOptionalParam<int64_t>(req, size_t(2), 100);
     
+    // Validate status filter
+    if (statusFilter != "all" && statusFilter != "pending" && 
+        statusFilter != "solved" && statusFilter != "expired") {
+        return InvalidParams("Invalid status filter. Use: all, pending, solved, expired", req.GetId());
+    }
+    
     // Limit max count
     if (maxCount <= 0) maxCount = 100;
     if (maxCount > 1000) maxCount = 1000;
@@ -6656,13 +6684,7 @@ RPCResponse cmd_listproblems(const RPCRequest& req, const RPCContext& ctx,
     auto& marketplace = marketplace::Marketplace::Instance();
     
     // Get problems based on filter
-    std::vector<const marketplace::Problem*> problemList;
-    
-    if (statusFilter == "pending" || statusFilter == "all") {
-        // Get pending problems
-        auto pending = marketplace.GetPendingProblems(static_cast<size_t>(maxCount));
-        problemList.insert(problemList.end(), pending.begin(), pending.end());
-    }
+    auto problemList = marketplace.GetAllProblems(statusFilter, static_cast<size_t>(maxCount));
     
     // Filter by type if specified
     if (!typeFilter.empty()) {
@@ -8080,6 +8102,105 @@ RPCResponse cmd_getfaucet(const RPCRequest& req, const RPCContext& ctx,
         
     } catch (const std::exception& e) {
         return InternalError(std::string("Faucet error: ") + e.what(), req.GetId());
+    }
+}
+
+// ============================================================================
+// Solver Rewards Implementation
+// ============================================================================
+
+/**
+ * Get accumulated rewards for a solver address.
+ * Shows total rewards earned from solving problems in the marketplace.
+ */
+RPCResponse cmd_getsolverrewards(const RPCRequest& req, const RPCContext& ctx,
+                                  RPCCommandTable* table) {
+    (void)ctx;
+    
+    try {
+        // Get optional solver address
+        std::string solverAddress = GetOptionalParam<std::string>(req, size_t(0), "");
+        
+        // If no address provided, try to get from wallet
+        if (solverAddress.empty()) {
+            auto* wallet = table->GetWallet();
+            if (wallet) {
+                auto addresses = wallet->GetAddresses();
+                if (!addresses.empty()) {
+                    solverAddress = addresses[0];
+                }
+            }
+        }
+        
+        if (solverAddress.empty()) {
+            return InvalidParams("No solver address provided and wallet has no addresses", req.GetId());
+        }
+        
+        // Access the marketplace
+        auto& marketplace = marketplace::Marketplace::Instance();
+        
+        // Get solver rewards
+        Amount totalRewards = marketplace.GetRewardsForSolver(solverAddress);
+        
+        // Get solutions by solver
+        auto solutions = marketplace.GetSolutionsBySolver(solverAddress, 1000);
+        
+        // Calculate statistics
+        size_t totalSolutions = solutions.size();
+        size_t acceptedSolutions = 0;
+        size_t rejectedSolutions = 0;
+        Amount earnedFromSolutions = 0;
+        
+        for (const auto* sol : solutions) {
+            if (!sol) continue;
+            if (sol->GetStatus() == marketplace::SolutionStatus::ACCEPTED) {
+                acceptedSolutions++;
+                earnedFromSolutions += sol->GetReward();
+            } else if (sol->GetStatus() == marketplace::SolutionStatus::REJECTED) {
+                rejectedSolutions++;
+            }
+        }
+        
+        // Build response
+        JSONValue::Object result;
+        result["solver"] = solverAddress;
+        result["total_rewards"] = FormatAmount(totalRewards);
+        result["total_rewards_raw"] = static_cast<int64_t>(totalRewards);
+        result["earned_from_solutions"] = FormatAmount(earnedFromSolutions);
+        result["earned_from_solutions_raw"] = static_cast<int64_t>(earnedFromSolutions);
+        result["total_solutions"] = static_cast<int64_t>(totalSolutions);
+        result["accepted_solutions"] = static_cast<int64_t>(acceptedSolutions);
+        result["rejected_solutions"] = static_cast<int64_t>(rejectedSolutions);
+        
+        // Calculate success rate
+        if (totalSolutions > 0) {
+            double successRate = static_cast<double>(acceptedSolutions) / totalSolutions * 100.0;
+            result["success_rate"] = successRate;
+        } else {
+            result["success_rate"] = 0.0;
+        }
+        
+        // Add recent solutions
+        JSONValue::Array recentSolutions;
+        size_t count = 0;
+        for (const auto* sol : solutions) {
+            if (!sol || count >= 10) break;  // Limit to 10 recent
+            
+            JSONValue::Object solObj;
+            solObj["solution_id"] = std::to_string(sol->GetId());
+            solObj["problem_id"] = std::to_string(sol->GetProblemId());
+            solObj["status"] = marketplace::SolutionStatusToString(sol->GetStatus());
+            solObj["reward"] = FormatAmount(sol->GetReward());
+            solObj["submission_time"] = sol->GetSubmissionTime();
+            recentSolutions.push_back(JSONValue(std::move(solObj)));
+            count++;
+        }
+        result["recent_solutions"] = JSONValue(std::move(recentSolutions));
+        
+        return RPCResponse::Success(JSONValue(std::move(result)), req.GetId());
+        
+    } catch (const std::exception& e) {
+        return InvalidParams(e.what(), req.GetId());
     }
 }
 

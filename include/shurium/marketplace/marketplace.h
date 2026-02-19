@@ -238,6 +238,12 @@ public:
     std::vector<const Problem*> GetProblemsByCreator(
         const std::string& creator) const;
     
+    /// Get all problems (with optional status filter)
+    /// @param status "all", "pending", "solved", or "expired"
+    std::vector<const Problem*> GetAllProblems(
+        const std::string& status = "all",
+        size_t maxCount = 100) const;
+    
     /// Cancel a problem (creator only)
     bool CancelProblem(Problem::Id id, const std::string& requester);
     

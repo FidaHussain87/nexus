@@ -265,6 +265,39 @@ std::vector<const Problem*> Marketplace::GetProblemsByCreator(
     return result;
 }
 
+std::vector<const Problem*> Marketplace::GetAllProblems(
+    const std::string& status,
+    size_t maxCount) const {
+    
+    std::lock_guard<std::mutex> lock(impl_->problemsMutex_);
+    
+    std::vector<const Problem*> result;
+    result.reserve(std::min(maxCount, impl_->problems_.size()));
+    
+    for (const auto& [id, problem] : impl_->problems_) {
+        if (result.size() >= maxCount) break;
+        
+        // Apply status filter
+        if (status == "all") {
+            result.push_back(&problem);
+        } else if (status == "pending") {
+            if (!problem.IsSolved() && !problem.IsExpired()) {
+                result.push_back(&problem);
+            }
+        } else if (status == "solved") {
+            if (problem.IsSolved()) {
+                result.push_back(&problem);
+            }
+        } else if (status == "expired") {
+            if (problem.IsExpired() && !problem.IsSolved()) {
+                result.push_back(&problem);
+            }
+        }
+    }
+    
+    return result;
+}
+
 bool Marketplace::CancelProblem(Problem::Id id, const std::string& requester) {
     std::lock_guard<std::mutex> lock(impl_->problemsMutex_);
     
