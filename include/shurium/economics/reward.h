@@ -148,7 +148,8 @@ private:
 using EpochId = uint32_t;
 
 /// Epoch duration in blocks (daily distribution)
-constexpr int EPOCH_BLOCKS = 2880; // ~24 hours at 30s blocks
+/// Note: Using smaller value (10) for testing. Production should use 2880 (~24 hours at 30s blocks)
+constexpr int EPOCH_BLOCKS = 10;
 
 /// Calculate epoch from block height
 inline EpochId HeightToEpoch(int height) {

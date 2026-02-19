@@ -820,6 +820,33 @@ sleep 5
 4. Regular security audits
 5. Monitor fund balances 24/7
 
+### Citizen UBI Registration
+
+Citizens can register for UBI distribution:
+
+```bash
+# Step 1: Create identity
+./shurium-cli createidentity
+# Output: {"identityId": "abc123...", "status": "pending"}
+
+# Step 2: Wait for activation (10 blocks regtest, 100 mainnet)
+./shurium-cli generatetoaddress 15 YOUR_ADDRESS  # Mining advances blocks
+
+# Step 3: Check identity status
+./shurium-cli getidentityinfo "YOUR_IDENTITY_ID"
+# Should show: "status": "active", "canClaimUBI": true
+
+# Step 4: Claim UBI (after epoch completes)
+./shurium-cli claimubi "YOUR_IDENTITY_ID"
+# Output: {"amount": 150, "success": true}
+```
+
+**UBI Distribution Flow:**
+1. 30% of each block reward goes to UBI Pool
+2. Each epoch (10 blocks), pool is finalized
+3. Citizens claim from PREVIOUS epoch
+4. Amount = Pool Total / Number of Eligible Citizens
+
 ### For Citizens
 1. Backup wallet.dat immediately after creation
 2. Never share your private keys

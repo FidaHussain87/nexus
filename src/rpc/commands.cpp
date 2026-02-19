@@ -4055,23 +4055,14 @@ RPCResponse cmd_createidentity(const RPCRequest& req, const RPCContext& ctx,
             return RPCResponse::Error(-32000, "Identity registration failed - commitment may already be registered", req.GetId());
         }
         
-        // Encrypt and store secrets in wallet (for later UBI claims)
-        std::array<Byte, 32> encryptionKey;
-        // Derive encryption key from wallet's master key
-        // For now, use a simple derivation from wallet address
-        auto addresses = wallet->GetAddresses();
-        if (!addresses.empty()) {
-            const std::string& addr = addresses[0];
-            std::copy_n(reinterpret_cast<const Byte*>(addr.data()), 
-                       std::min(addr.size(), size_t(32)), 
-                       encryptionKey.begin());
-        }
-        
         // Update secrets with tree index
         secrets.treeIndex = record->treeIndex;
         
-        // Store encrypted secrets (in real impl, wallet would have dedicated identity storage)
-        std::vector<Byte> encryptedSecrets = secrets.Encrypt(encryptionKey);
+        // Store secrets in wallet for later UBI claims
+        if (!wallet->RegisterIdentity(secrets)) {
+            // Registration succeeded but storage failed - warn but don't fail
+            LOG_WARN(util::LogCategory::WALLET) << "Failed to store identity secrets in wallet";
+        }
         
         JSONValue::Object result;
         result["identityId"] = IdentityIdToHex(record->id);
@@ -4080,7 +4071,7 @@ RPCResponse cmd_createidentity(const RPCRequest& req, const RPCContext& ctx,
         result["registrationHeight"] = static_cast<int64_t>(record->registrationHeight);
         result["message"] = "Identity created successfully. It will become active after activation delay.";
         
-        // Clear secrets from memory
+        // Clear secrets from memory (wallet has its own copy)
         secrets.Clear();
         
         return RPCResponse::Success(JSONValue(std::move(result)), req.GetId());
@@ -4218,7 +4209,11 @@ RPCResponse cmd_claimubi(const RPCRequest& req, const RPCContext& ctx,
             return RPCResponse::Success(JSONValue(std::move(result)), req.GetId());
         }
         
-        identity::EpochId currentEpoch = idMgr->GetCurrentEpoch();
+        // Get current epoch from UBI distributor (block-based)
+        identity::EpochId currentEpoch = ubiDist->GetCurrentEpoch();
+        
+        // Try to claim from the previous epoch (which should be finalized)
+        identity::EpochId claimEpoch = currentEpoch > 0 ? currentEpoch - 1 : 0;
         
         // Get recipient address
         Hash160 recipient;
@@ -4262,8 +4257,8 @@ RPCResponse cmd_claimubi(const RPCRequest& req, const RPCContext& ctx,
             }
         }
         
-        // Use wallet to create the UBI claim
-        auto [claimOpt, error] = wallet->CreateUBIClaim(currentEpoch, recipient);
+        // Use wallet to create the UBI claim for the finalized epoch
+        auto [claimOpt, error] = wallet->CreateUBIClaim(claimEpoch, recipient);
         
         if (!claimOpt) {
             result["success"] = false;
@@ -4287,7 +4282,7 @@ RPCResponse cmd_claimubi(const RPCRequest& req, const RPCContext& ctx,
         // Process the claim
         economics::ClaimStatus status = ubiDist->ProcessClaim(claim, treeRootHash, currentHeight);
         
-        result["epoch"] = static_cast<int64_t>(currentEpoch);
+        result["epoch"] = static_cast<int64_t>(claimEpoch);
         result["claimStatus"] = economics::ClaimStatusToString(status);
         
         if (status == economics::ClaimStatus::Valid) {
@@ -4367,22 +4362,30 @@ RPCResponse cmd_getubiinfo(const RPCRequest& req, const RPCContext& ctx,
         
         // Get current epoch pool info
         const economics::EpochUBIPool* pool = ubiDist->GetPool(currentEpoch);
-        if (pool && pool->isFinalized) {
-            result["amountPerPerson"] = FormatAmount(pool->amountPerPerson);
-            result["pendingAmount"] = FormatAmount(isEligible ? pool->amountPerPerson : 0);
+        if (pool) {
             result["poolTotal"] = FormatAmount(pool->totalPool);
-            result["poolClaimed"] = FormatAmount(pool->amountClaimed);
-            result["claimCount"] = static_cast<int64_t>(pool->claimCount);
-            result["eligibleCount"] = static_cast<int64_t>(pool->eligibleCount);
-            result["claimRate"] = pool->ClaimRate();
+            result["poolFinalized"] = pool->isFinalized;
+            if (pool->isFinalized) {
+                result["amountPerPerson"] = FormatAmount(pool->amountPerPerson);
+                result["pendingAmount"] = FormatAmount(isEligible ? pool->amountPerPerson : 0);
+                result["poolClaimed"] = FormatAmount(pool->amountClaimed);
+                result["claimCount"] = static_cast<int64_t>(pool->claimCount);
+                result["eligibleCount"] = static_cast<int64_t>(pool->eligibleCount);
+                result["claimRate"] = pool->ClaimRate();
+            } else {
+                // Pool not finalized yet - show estimated amount
+                auto stats = idMgr->GetStats();
+                Amount estimated = ubiDist->GetAmountPerPerson(currentEpoch);
+                result["amountPerPerson"] = FormatAmount(estimated);
+                result["pendingAmount"] = FormatAmount(isEligible ? estimated : 0);
+                result["activeIdentities"] = static_cast<int64_t>(stats.activeIdentities);
+            }
         } else {
-            // Pool not finalized yet - show estimated amount
-            auto stats = idMgr->GetStats();
-            Amount estimated = ubiDist->GetAmountPerPerson(currentEpoch);
-            result["amountPerPerson"] = FormatAmount(estimated);
-            result["pendingAmount"] = FormatAmount(isEligible ? estimated : 0);
+            result["poolTotal"] = FormatAmount(0);
             result["poolFinalized"] = false;
-            result["activeIdentities"] = static_cast<int64_t>(stats.activeIdentities);
+            result["amountPerPerson"] = FormatAmount(0);
+            result["pendingAmount"] = FormatAmount(0);
+            result["activeIdentities"] = static_cast<int64_t>(idMgr->GetStats().activeIdentities);
         }
         
         // Get distribution stats
@@ -6729,6 +6732,25 @@ RPCResponse cmd_generatetoaddress(const RPCRequest& req, const RPCContext& ctx,
             wallet::Wallet* wallet = table->GetWallet();
             if (wallet) {
                 wallet->ProcessBlock(block, blockTemplate.height);
+            }
+            
+            // Update identity manager with new block context
+            identity::IdentityManager* idMgr = table->GetIdentityManager();
+            if (idMgr) {
+                idMgr->SetBlockContext(static_cast<uint32_t>(blockTemplate.height), GetTime());
+            }
+            
+            // Add block reward to UBI pool
+            economics::UBIDistributor* ubiDist = table->GetUBIDistributor();
+            if (ubiDist) {
+                // Calculate UBI amount for this block (30% of block reward)
+                Amount blockReward = 50 * COIN;  // Initial block reward
+                int halvings = blockTemplate.height / 1000;  // Regtest halving interval
+                if (halvings > 0 && halvings < 64) {
+                    blockReward >>= halvings;
+                }
+                Amount ubiAmount = (blockReward * 30) / 100;  // 30% to UBI
+                ubiDist->AddBlockReward(blockTemplate.height, ubiAmount);
             }
             
             // Add to result array

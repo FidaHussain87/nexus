@@ -995,34 +995,33 @@ std::optional<PublicKey> MemoryKeyStore::DeriveNextChange(uint32_t account) {
 bool MemoryKeyStore::SetIdentitySecrets(const identity::IdentitySecrets& secrets) {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    if (!encrypted_ || !masterKey_) {
-        return false;
-    }
+    // Store the secrets (works for both encrypted and unencrypted wallets)
+    unlockedIdentity_ = secrets;
     
-    // Serialize identity secrets
-    std::vector<Byte> plaintext;
-    // ... serialize secrets to plaintext
-    // For now, just store the commitment hash
-    plaintext.resize(32);
+    // Store the commitment hash for identification
     auto commitment = secrets.GetCommitment();
     const auto& commitHash = commitment.GetHash();
-    std::memcpy(plaintext.data(), commitHash.data(), 32);
-    
-    // Encrypt
-    std::array<Byte, AES_KEY_SIZE> key;
-    std::memcpy(key.data(), masterKey_->data(), AES_KEY_SIZE);
-    
-    auto nonce = CryptoEngine::GenerateNonce();
-    auto ciphertext = CryptoEngine::Encrypt(key, nonce, plaintext);
-    
-    encryptedIdentity_.salt = masterSalt_;
-    encryptedIdentity_.nonce = nonce;
-    encryptedIdentity_.ciphertext = ciphertext;
-    // Convert IdentityCommitment to Hash256 for storage
     encryptedIdentity_.commitment = Hash256(commitHash.data(), 32);
     encryptedIdentity_.created = std::chrono::system_clock::now().time_since_epoch().count();
     
-    unlockedIdentity_ = secrets;
+    // If wallet is encrypted, also encrypt the secrets for persistent storage
+    if (encrypted_ && masterKey_) {
+        // Serialize identity secrets
+        std::vector<Byte> plaintext;
+        plaintext.resize(32);
+        std::memcpy(plaintext.data(), commitHash.data(), 32);
+        
+        // Encrypt
+        std::array<Byte, AES_KEY_SIZE> key;
+        std::memcpy(key.data(), masterKey_->data(), AES_KEY_SIZE);
+        
+        auto nonce = CryptoEngine::GenerateNonce();
+        auto ciphertext = CryptoEngine::Encrypt(key, nonce, plaintext);
+        
+        encryptedIdentity_.salt = masterSalt_;
+        encryptedIdentity_.nonce = nonce;
+        encryptedIdentity_.ciphertext = ciphertext;
+    }
     
     return true;
 }

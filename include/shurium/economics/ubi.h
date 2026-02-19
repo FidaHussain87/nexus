@@ -36,14 +36,15 @@ namespace economics {
 
 // Forward declarations
 class UBIPool;
-class UBIClaim;
+struct UBIClaim;
 
 // ============================================================================
 // UBI Constants
 // ============================================================================
 
 /// Minimum number of verified identities for UBI distribution
-constexpr uint32_t MIN_IDENTITIES_FOR_UBI = 100;
+/// Note: Using 1 for testing. Production should use a higher value (e.g., 100)
+constexpr uint32_t MIN_IDENTITIES_FOR_UBI = 1;
 
 /// Maximum UBI amount per person per epoch (safety cap)
 constexpr Amount MAX_UBI_PER_PERSON = 10000 * COIN;

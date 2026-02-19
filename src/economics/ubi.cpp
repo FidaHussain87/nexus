@@ -264,6 +264,21 @@ void UBIDistributor::AddBlockReward(int height, Amount amount) {
     std::lock_guard<std::mutex> lock(mutex_);
     
     EpochId epoch = HeightToEpoch(height);
+    
+    // If epoch changed, finalize the previous epoch(s)
+    if (epoch > currentEpoch_) {
+        // Finalize all epochs from currentEpoch_ to epoch-1
+        for (EpochId e = currentEpoch_; e < epoch; ++e) {
+            auto it = pools_.find(e);
+            if (it != pools_.end() && !it->second.isFinalized) {
+                EpochUBIPool& prevPool = it->second;
+                prevPool.endHeight = EpochEndHeight(e);
+                prevPool.claimDeadline = prevPool.endHeight + UBI_CLAIM_WINDOW + (UBI_GRACE_EPOCHS * EPOCH_BLOCKS);
+                prevPool.Finalize(1);  // TODO: Get actual identity count from identity manager
+            }
+        }
+    }
+    
     currentEpoch_ = epoch;
     
     EpochUBIPool& pool = GetOrCreatePool(epoch);

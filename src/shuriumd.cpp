@@ -20,6 +20,9 @@
 #include <shurium/staking/staking.h>
 #include <shurium/crypto/keys.h>
 #include <shurium/economics/funds.h>
+#include <shurium/economics/ubi.h>
+#include <shurium/economics/reward.h>
+#include <shurium/identity/identity.h>
 
 #include <atomic>
 #include <chrono>
@@ -173,6 +176,9 @@ static std::unique_ptr<NodeContext> g_node;
 static std::shared_ptr<wallet::Wallet> g_wallet;
 static std::unique_ptr<miner::Miner> g_miner;
 static std::unique_ptr<staking::StakingEngine> g_stakingEngine;
+static std::shared_ptr<identity::IdentityManager> g_identityManager;
+static std::shared_ptr<economics::UBIDistributor> g_ubiDistributor;
+static std::unique_ptr<economics::RewardCalculator> g_rewardCalculator;
 
 // ============================================================================
 // Signal Handling
@@ -1221,6 +1227,30 @@ int AppMain(int argc, char* argv[]) {
             g_stakingEngine.get(), [](staking::StakingEngine*){}));
     }
     
+    // Initialize identity manager for UBI system
+    identity::IdentityManager::Config idConfig;
+    idConfig.epochDuration = g_config.regtest ? 60 : 604800;  // 60 seconds for regtest, 1 week for mainnet
+    idConfig.activationDelay = g_config.regtest ? 10 : 100;  // Faster for regtest
+    idConfig.genesisTime = g_config.regtest ? GetTime() : 1704067200;  // Jan 1, 2024 for mainnet
+    
+    g_identityManager = std::make_shared<identity::IdentityManager>(idConfig);
+    LOG_INFO(util::LogCategory::DEFAULT) << "Identity manager initialized";
+    
+    // Initialize UBI distributor using consensus params from node
+    if (g_node && g_node->params) {
+        g_rewardCalculator = std::make_unique<economics::RewardCalculator>(*g_node->params);
+        g_ubiDistributor = std::make_shared<economics::UBIDistributor>(*g_rewardCalculator);
+        LOG_INFO(util::LogCategory::DEFAULT) << "UBI distributor initialized";
+        
+        // Wire up identity and UBI to RPC commands
+        if (g_rpcCommands) {
+            g_rpcCommands->SetIdentityManager(g_identityManager);
+            g_rpcCommands->SetUBIDistributor(g_ubiDistributor);
+        }
+    } else {
+        LOG_WARN(util::LogCategory::DEFAULT) << "UBI distributor not initialized - node params not available";
+    }
+    
     // Initialize miner (create even if not starting, for setgenerate support)
     // Get mining address (from config or wallet)
     Hash160 miningAddress;
@@ -1283,9 +1313,22 @@ int AppMain(int argc, char* argv[]) {
                 LOG_INFO(util::LogCategory::DEFAULT) << "Mined block " 
                     << block.GetHash().ToHex().substr(0, 16) << "... accepted!";
                 
+                int32_t height = g_node ? g_node->GetHeight() : 0;
+                int64_t timestamp = GetTime();
+                
+                // Update identity manager with new block context
+                if (g_identityManager) {
+                    g_identityManager->SetBlockContext(static_cast<uint32_t>(height), timestamp);
+                }
+                
+                // Add block reward to UBI pool
+                if (g_ubiDistributor && g_rewardCalculator) {
+                    Amount ubiAmount = g_rewardCalculator->GetUBIPoolAmount(height);
+                    g_ubiDistributor->AddBlockReward(height, ubiAmount);
+                }
+                
                 // Notify wallet about the new block so it can track coinbase outputs
                 if (g_wallet) {
-                    int32_t height = g_node ? g_node->GetHeight() : 0;
                     g_wallet->ProcessBlock(block, height);
                     LOG_DEBUG(util::LogCategory::DEFAULT) << "Wallet notified of new block at height " << height;
                 }

@@ -632,6 +632,16 @@ void IdentityManager::SetBlockContext(uint32_t height, int64_t timestamp) {
         currentEpoch_ = newEpoch;
         nullifierSet_.SetCurrentEpoch(newEpoch);
     }
+    
+    // Activate pending identities that have passed the activation delay
+    for (auto& [hash, record] : identities_) {
+        if (record.status == IdentityStatus::Pending) {
+            if (height >= record.registrationHeight + config_.activationDelay) {
+                record.status = IdentityStatus::Active;
+                record.lastUpdateHeight = height;
+            }
+        }
+    }
 }
 
 EpochId IdentityManager::GetCurrentEpoch() const {

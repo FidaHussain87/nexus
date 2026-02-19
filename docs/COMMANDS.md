@@ -1387,20 +1387,48 @@ Releases jailed validator.
 
 ### createidentity
 
-Creates new identity.
+Creates a new identity for UBI participation. The identity starts in `pending` status and becomes `active` after the activation delay (10 blocks in regtest, 100 in mainnet).
 
 ```bash
-./shurium-cli createidentity "PROOF_DATA"
+./shurium-cli createidentity
 ```
+
+**Example Output:**
+```json
+{
+  "identityId": "fcb78ec755251b5e...",
+  "message": "Identity created successfully. It will become active after activation delay.",
+  "registrationHeight": 0,
+  "status": "pending",
+  "treeIndex": 0
+}
+```
+
+**Notes:**
+- Identity secrets are stored in your wallet for later UBI claims
+- One identity per wallet
+- Identity becomes claimable after activation delay
 
 ---
 
 ### getidentityinfo
 
-Returns identity information.
+Returns detailed identity information.
 
 ```bash
-./shurium-cli getidentityinfo "ADDRESS"
+./shurium-cli getidentityinfo "IDENTITY_ID"
+```
+
+**Example Output:**
+```json
+{
+  "canClaimUBI": true,
+  "identityId": "fcb78ec755251b5e...",
+  "identityStatus": "active",
+  "registrationHeight": 0,
+  "treeIndex": 0,
+  "verified": true
+}
 ```
 
 ---
@@ -1417,20 +1445,62 @@ Verifies identity proof.
 
 ### claimubi
 
-Claims UBI for identity.
+Claims UBI for the previous finalized epoch. Each identity can only claim once per epoch.
 
 ```bash
-./shurium-cli claimubi "IDENTITY_ID"
+./shurium-cli claimubi "IDENTITY_ID" [recipient_address]
 ```
+
+**Example Output (Success):**
+```json
+{
+  "amount": 150,
+  "claimStatus": "Valid",
+  "epoch": 2,
+  "identityId": "fcb78ec755251b5e...",
+  "message": "UBI claimed successfully",
+  "success": true
+}
+```
+
+**Example Output (Double-claim):**
+```json
+{
+  "amount": 0,
+  "claimStatus": "DoubleClaim",
+  "message": "Already claimed UBI for this epoch",
+  "success": false
+}
+```
+
+**Notes:**
+- UBI is claimed from the PREVIOUS epoch (which is finalized)
+- Amount = (epoch's UBI pool) / (number of eligible identities)
+- Each epoch is 10 blocks in current configuration
 
 ---
 
 ### getubiinfo
 
-Returns UBI information.
+Returns UBI distribution information for an identity.
 
 ```bash
 ./shurium-cli getubiinfo "IDENTITY_ID"
+```
+
+**Example Output:**
+```json
+{
+  "activeIdentities": 1,
+  "amountPerPerson": 150,
+  "averageClaimRate": 50,
+  "currentEpoch": 4,
+  "eligible": true,
+  "identityStatus": "active",
+  "poolTotal": 90,
+  "totalClaimsAllTime": 2,
+  "totalDistributed": 300
+}
 ```
 
 ---
