@@ -121,11 +121,11 @@ TEST_F(StakingTest, FormatStakeAmount) {
 }
 
 TEST_F(StakingTest, CalculateAnnualReward) {
-    // 5% of 1000 NXS = 50 NXS
+    // 5% of 1000 SHR = 50 SHR
     Amount reward = CalculateAnnualReward(1000 * COIN, 500);
     EXPECT_EQ(reward, 50 * COIN);
     
-    // 10% of 10000 NXS = 1000 NXS
+    // 10% of 10000 SHR = 1000 SHR
     reward = CalculateAnnualReward(10000 * COIN, 1000);
     EXPECT_EQ(reward, 1000 * COIN);
 }

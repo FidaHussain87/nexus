@@ -734,7 +734,9 @@ TEST(ProofVerifierTest, VerifyPlaceholderProof) {
     proof.SetPublicInputs(PublicInputs({FieldElement::One()}));
     proof.SetProofData({0x01, 0x02, 0x03});
     
-    EXPECT_TRUE(verifier.Verify(proof, "placeholder_circuit"));
+    // Placeholder proofs are now rejected in production mode for security
+    // They should NOT verify successfully
+    EXPECT_FALSE(verifier.Verify(proof, "placeholder_circuit"));
 }
 
 // ============================================================================

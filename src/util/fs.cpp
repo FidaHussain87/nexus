@@ -3,12 +3,14 @@
 // MIT License
 
 #include "shurium/util/fs.h"
+#include "shurium/crypto/sha256.h"
 
 #include <algorithm>
 #include <cstring>
 #include <fstream>
 #include <random>
 #include <sstream>
+#include <iomanip>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -1357,10 +1359,42 @@ Path UniqueFilename(const Path& path) {
 }
 
 std::string FileChecksum(const Path& path) {
-    // Placeholder - would need SHA256 implementation
-    // Return empty string for now
-    (void)path;
-    return "";
+    // Read file and compute SHA256 hash
+    std::ifstream file(path.String(), std::ios::binary);
+    if (!file) {
+        return "";
+    }
+    
+    // Read file contents
+    std::vector<Byte> contents;
+    constexpr size_t CHUNK_SIZE = 8192;
+    std::array<char, CHUNK_SIZE> buffer;
+    
+    while (file) {
+        file.read(buffer.data(), CHUNK_SIZE);
+        std::streamsize bytesRead = file.gcount();
+        if (bytesRead > 0) {
+            contents.insert(contents.end(), 
+                           reinterpret_cast<const Byte*>(buffer.data()),
+                           reinterpret_cast<const Byte*>(buffer.data() + bytesRead));
+        }
+    }
+    
+    if (contents.empty() && !file.eof()) {
+        return "";  // Error reading file
+    }
+    
+    // Compute SHA256 hash
+    Hash256 hash = SHA256Hash(contents);
+    
+    // Convert to hex string
+    std::ostringstream oss;
+    oss << std::hex << std::setfill('0');
+    for (size_t i = 0; i < hash.size(); ++i) {
+        oss << std::setw(2) << static_cast<unsigned>(hash[i]);
+    }
+    
+    return oss.str();
 }
 
 } // namespace fs

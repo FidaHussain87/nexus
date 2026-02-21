@@ -481,7 +481,7 @@ TEST_F(UBITest, LargePoolCalculation) {
     EpochUBIPool pool;
     pool.epoch = 1;
     // Use a very large pool
-    pool.totalPool = Amount(1e17);  // 1 billion NXS
+    pool.totalPool = Amount(1e17);  // 1 billion SHR
     pool.Finalize(1000000);  // 1 million identities
     
     // Should calculate without overflow

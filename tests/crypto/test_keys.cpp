@@ -100,51 +100,51 @@ TEST(Base58CheckTest, DecodeTooShort) {
 
 TEST(Bech32Test, EncodeP2WPKH) {
     std::vector<uint8_t> program(20, 0x00);  // 20 zero bytes
-    std::string address = EncodeBech32("nx", 0, program);
+    std::string address = EncodeBech32("shr", 0, program);
     
     EXPECT_FALSE(address.empty());
-    EXPECT_EQ(address.substr(0, 3), "nx1");  // HRP + separator
+    EXPECT_EQ(address.substr(0, 4), "shr1");  // HRP + separator
 }
 
 TEST(Bech32Test, EncodeP2TR) {
     std::vector<uint8_t> program(32, 0xAB);  // 32 bytes
-    std::string address = EncodeBech32m("nx", 1, program);
+    std::string address = EncodeBech32m("shr", 1, program);
     
     EXPECT_FALSE(address.empty());
-    EXPECT_EQ(address.substr(0, 3), "nx1");
+    EXPECT_EQ(address.substr(0, 4), "shr1");
 }
 
 TEST(Bech32Test, DecodeValid) {
     // Encode first
     std::vector<uint8_t> program(20, 0x42);
-    std::string encoded = EncodeBech32("nx", 0, program);
+    std::string encoded = EncodeBech32("shr", 0, program);
     
     // Decode
     auto result = DecodeBech32(encoded);
     ASSERT_TRUE(result.has_value());
     
     auto [hrp, version, decoded] = *result;
-    EXPECT_EQ(hrp, "nx");
+    EXPECT_EQ(hrp, "shr");
     EXPECT_EQ(version, 0);
     EXPECT_EQ(decoded, program);
 }
 
 TEST(Bech32Test, DecodeBech32m) {
     std::vector<uint8_t> program(32, 0x11);
-    std::string encoded = EncodeBech32m("nx", 1, program);
+    std::string encoded = EncodeBech32m("shr", 1, program);
     
     auto result = DecodeBech32(encoded);
     ASSERT_TRUE(result.has_value());
     
     auto [hrp, version, decoded] = *result;
-    EXPECT_EQ(hrp, "nx");
+    EXPECT_EQ(hrp, "shr");
     EXPECT_EQ(version, 1);
     EXPECT_EQ(decoded, program);
 }
 
 TEST(Bech32Test, DecodeInvalid) {
     EXPECT_FALSE(DecodeBech32("").has_value());
-    EXPECT_FALSE(DecodeBech32("nx").has_value());  // No separator
+    EXPECT_FALSE(DecodeBech32("shr").has_value());  // No separator
     EXPECT_FALSE(DecodeBech32("1invalid").has_value());  // Bad format
 }
 
@@ -552,7 +552,7 @@ TEST(AddressTest, EncodeP2WPKH) {
     
     std::string address = EncodeP2WPKH(hash, false);
     EXPECT_FALSE(address.empty());
-    EXPECT_EQ(address.substr(0, 3), "nx1");  // SHURIUM bech32 prefix
+    EXPECT_EQ(address.substr(0, 3), "shr");  // SHURIUM bech32 prefix
 }
 
 TEST(AddressTest, GetAddressTypeP2PKH) {

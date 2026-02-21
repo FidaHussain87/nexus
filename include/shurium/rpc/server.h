@@ -568,7 +568,7 @@ std::string GenerateRPCPassword(size_t length = 32);
  * @param prefix Optional prefix for the username
  * @return Username string
  */
-std::string GenerateRPCUsername(const std::string& prefix = "nexus");
+std::string GenerateRPCUsername(const std::string& prefix = "shurium");
 
 /**
  * Generate both username and password for RPC authentication and write to a cookie file.

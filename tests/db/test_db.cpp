@@ -327,7 +327,7 @@ TEST_F(DatabaseTest, UTXODBAddAndGetCoin) {
     }
     OutPoint outpoint(txHash, 0);
     
-    TxOut txout(1000000, Script());  // 0.01 NXS
+    TxOut txout(1000000, Script());  // 0.01 SHR
     Coin coin(txout, 100, false);
     
     // Add coin

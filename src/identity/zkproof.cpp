@@ -3,6 +3,7 @@
 // MIT License
 
 #include <shurium/identity/zkproof.h>
+#include <shurium/identity/commitment.h>
 #include <shurium/core/hex.h>
 #include <shurium/core/random.h>
 #include <shurium/crypto/sha256.h>
@@ -466,6 +467,10 @@ IdentityProof IdentityProof::CreateUBIClaimProof(
     
     proof.zkProof_.SetGroth16Proof(g16proof);
     
+    // Store the identity commitment and merkle proof for verification
+    proof.identityCommitment_ = identityCommitment;
+    proof.merkleProof_ = merkleProof;
+    
     return proof;
 }
 
@@ -506,10 +511,10 @@ bool IdentityProof::VerifyProof(const FieldElement& identityRoot) const {
         return false;
     }
     
-    // For placeholder proofs, we accept any well-formed proof
-    // In production, this would verify the actual SNARK
+    // Placeholder proofs are NOT accepted in production
+    // All proofs must be valid Groth16 or PLONK proofs
     if (zkProof_.GetSystem() == ProofSystem::Placeholder) {
-        return zkProof_.IsValid();
+        return false;  // Reject placeholder proofs
     }
     
     // For real proofs, use the verifier
@@ -547,6 +552,18 @@ std::vector<Byte> IdentityProof::ToBytes() const {
         result.push_back(static_cast<Byte>((proofLen >> (i * 8)) & 0xFF));
     }
     result.insert(result.end(), proofBytes.begin(), proofBytes.end());
+    
+    // Identity commitment (32 bytes)
+    auto commitBytes = identityCommitment_.ToBytes();
+    result.insert(result.end(), commitBytes.begin(), commitBytes.end());
+    
+    // Merkle proof
+    auto merkleBytes = merkleProof_.ToBytes();
+    uint32_t merkleLen = static_cast<uint32_t>(merkleBytes.size());
+    for (int i = 0; i < 4; ++i) {
+        result.push_back(static_cast<Byte>((merkleLen >> (i * 8)) & 0xFF));
+    }
+    result.insert(result.end(), merkleBytes.begin(), merkleBytes.end());
     
     return result;
 }
@@ -591,6 +608,37 @@ std::optional<IdentityProof> IdentityProof::FromBytes(const Byte* data, size_t l
         return std::nullopt;
     }
     proof.zkProof_ = std::move(*zkProof);
+    data += proofLen;
+    len -= proofLen;
+    
+    // Identity commitment (32 bytes)
+    if (len < 32) {
+        return std::nullopt;
+    }
+    proof.identityCommitment_ = FieldElement::FromBytes(data, 32);
+    data += 32;
+    len -= 32;
+    
+    // Merkle proof length
+    if (len < 4) {
+        return std::nullopt;
+    }
+    uint32_t merkleLen = 0;
+    for (int i = 0; i < 4; ++i) {
+        merkleLen |= static_cast<uint32_t>(data[i]) << (i * 8);
+    }
+    data += 4;
+    len -= 4;
+    
+    if (len < merkleLen) {
+        return std::nullopt;
+    }
+    
+    auto merkleProof = VectorCommitment::MerkleProof::FromBytes(data, merkleLen);
+    if (!merkleProof) {
+        return std::nullopt;
+    }
+    proof.merkleProof_ = std::move(*merkleProof);
     
     return proof;
 }
@@ -635,9 +683,9 @@ bool ProofVerifier::Verify(const ZKProof& proof, const std::string& circuitId) c
         return false;
     }
     
-    // For placeholder proofs, just check structure
+    // Placeholder proofs are NOT accepted in production
     if (proof.GetSystem() == ProofSystem::Placeholder) {
-        return proof.IsValid();
+        return false;  // Reject placeholder proofs
     }
     
     // For Groth16 proofs
@@ -768,11 +816,46 @@ bool ProofVerifier::VerifyIdentityProof(const IdentityProof& proof,
         vk.system = ProofSystem::Groth16;
         vk.numPublicInputs = 3;  // identityRoot, nullifier, epoch
         
-        return VerifyGroth16(*g16proof, zkProof.GetPublicInputs(), vk);
+        // Step 1: Verify the ZK proof (Sigma protocol verification)
+        if (!VerifyGroth16(*g16proof, zkProof.GetPublicInputs(), vk)) {
+            return false;
+        }
+        
+        // Step 2: Verify the Merkle proof - identity commitment is in the tree
+        // This is the CRITICAL security check that proves the identity is registered
+        const FieldElement& identityCommitment = proof.GetIdentityCommitment();
+        const auto& merkleProof = proof.GetMerkleProof();
+        
+        // Check that merkle proof is non-empty (has siblings)
+        if (merkleProof.siblings.empty()) {
+            // Allow empty merkle proof only if identity commitment is the root itself
+            // This would be the case for a tree with only one element
+            if (identityCommitment != identityRoot) {
+                return false;  // No merkle proof and commitment doesn't match root
+            }
+            // Single-element tree: commitment IS the root, proof is trivially valid
+            return true;
+        }
+        
+        // Verify the merkle proof: compute root from leaf and path
+        if (!VectorCommitment::VerifyProof(identityRoot, identityCommitment, merkleProof)) {
+            return false;  // Merkle proof invalid - identity not in tree
+        }
+        
+        // Step 3: Verify that the identity commitment in the proof matches
+        // what's encoded in the Groth16 proof (proofB[96..128])
+        FieldElement proofIdentityCommitment = FieldElement::FromBytes(
+            g16proof->proofB.data() + 96, 32);
+        if (proofIdentityCommitment != identityCommitment) {
+            return false;  // Identity commitment mismatch
+        }
+        
+        return true;  // All checks passed
     }
     
-    // For placeholder proofs, just check validity
-    return zkProof.IsValid();
+    // Reject all other proof systems including Placeholder
+    // Only Groth16 proofs are accepted
+    return false;
 }
 
 ProofVerifier& ProofVerifier::Instance() {
@@ -818,12 +901,18 @@ std::optional<IdentityProof> ProofGenerator::GenerateUBIClaimProof(
 
 ZKProof ProofGenerator::GeneratePlaceholderProof(ProofType type,
                                                   const PublicInputs& publicInputs) const {
+    // NOTE: GeneratePlaceholderProof should NOT be used in production.
+    // This function exists only for testing purposes.
+    // Production code should use GenerateUBIClaimProof or other proper proof generation.
+    //
+    // Placeholder proofs will be REJECTED by verification.
+    // This function is deprecated and will be removed.
+    
     ZKProof proof(type, ProofSystem::Placeholder);
     proof.SetPublicInputs(publicInputs);
     
-    // Generate random placeholder proof data
-    std::vector<Byte> proofData(128);
-    GetRandBytes(proofData.data(), proofData.size());
+    // Mark as invalid placeholder - will be rejected by verifier
+    std::vector<Byte> proofData(128, 0);  // All zeros = obviously invalid
     proof.SetProofData(proofData);
     
     return proof;

@@ -142,18 +142,18 @@ Block CreateGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits,
     // Default timestamp message for SHURIUM
     const char* pszTimestamp = "SHURIUM: Next Evolution Universal Exchange System - Genesis";
     
-    // Default output script (OP_RETURN with message - unspendable)
-    // In production, this would be a P2PKH to a well-known address
+    // Genesis output script is OP_RETURN (unspendable) for security
+    // The genesis reward is symbolic and represents the initial network state
+    // Using OP_RETURN ensures no one can ever spend these coins, preventing
+    // any security issues from genesis block coin distribution
     Script genesisOutputScript;
     
-    // For now, create a P2PKH script with a placeholder pubkey hash
-    // The genesis reward is symbolic and typically unspendable
-    Hash160 genesisPubKeyHash;
-    // Fill with identifiable pattern
-    for (size_t i = 0; i < 20; ++i) {
-        genesisPubKeyHash[i] = static_cast<uint8_t>(i);
-    }
-    genesisOutputScript = Script::CreateP2PKH(genesisPubKeyHash);
+    // Create an OP_RETURN script with the genesis message
+    // This makes the output provably unspendable
+    std::string genesisMessage = "SHURIUM Genesis Block - Next Evolution Universal Exchange System";
+    std::vector<uint8_t> messageBytes(genesisMessage.begin(), genesisMessage.end());
+    
+    genesisOutputScript << OP_RETURN << messageBytes;
     
     return CreateGenesisBlock(pszTimestamp, genesisOutputScript,
                               nTime, nNonce, nBits, nVersion, genesisReward);

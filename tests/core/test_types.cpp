@@ -175,11 +175,11 @@ TEST(Hash160Test, SizeIs20Bytes) {
 // ============================================================================
 
 TEST(AmountTest, Coin) {
-    EXPECT_EQ(COIN, 100000000LL);  // 1 NXS = 100 million smallest units
+    EXPECT_EQ(COIN, 100000000LL);  // 1 SHR = 100 million smallest units
 }
 
 TEST(AmountTest, MaxMoney) {
-    // Maximum supply: ~21 billion NXS (more than Bitcoin since we have UBI)
+    // Maximum supply: ~21 billion SHR (more than Bitcoin since we have UBI)
     EXPECT_GT(MAX_MONEY, 0);
     EXPECT_EQ(MAX_MONEY, 21000000000LL * COIN);
 }

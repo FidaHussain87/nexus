@@ -52,13 +52,13 @@ constexpr size_t MESSAGE_HEADER_SIZE = 4 + 12 + 4 + 4;  // magic + type + size +
 // Network magic bytes (identify which network a message is for)
 namespace NetworkMagic {
     /// Mainnet magic bytes
-    constexpr std::array<uint8_t, 4> MAINNET = {0x4E, 0x58, 0x55, 0x53};  // "NXUS"
+    constexpr std::array<uint8_t, 4> MAINNET = {0x53, 0x48, 0x52, 0x4D};  // "SHRM"
     
     /// Testnet magic bytes  
-    constexpr std::array<uint8_t, 4> TESTNET = {0x54, 0x4E, 0x58, 0x53};  // "TNXS"
+    constexpr std::array<uint8_t, 4> TESTNET = {0x54, 0x53, 0x48, 0x52};  // "TSHR"
     
     /// Regtest magic bytes
-    constexpr std::array<uint8_t, 4> REGTEST = {0x52, 0x4E, 0x58, 0x53};  // "RNXS"
+    constexpr std::array<uint8_t, 4> REGTEST = {0x52, 0x53, 0x48, 0x52};  // "RSHR"
 }
 
 // Default ports

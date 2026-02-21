@@ -42,10 +42,10 @@ class DelegationRegistry;
 // Governance Constants
 // ============================================================================
 
-/// Minimum stake required to create proposals (10,000 NXS)
+/// Minimum stake required to create proposals (10,000 SHR)
 constexpr Amount MIN_PROPOSAL_STAKE = 10000 * COIN;
 
-/// Minimum stake required to vote (100 NXS)
+/// Minimum stake required to vote (100 SHR)
 constexpr Amount MIN_VOTING_STAKE = 100 * COIN;
 
 /// Parameter change voting period (blocks) - ~3 days
@@ -862,6 +862,9 @@ public:
     /// Update voting power for a participant
     void UpdateVotingPower(const VoterId& voter, uint64_t power);
     
+    /// Register a voter's public key (needed for vote signature verification)
+    void RegisterVoterKey(const PublicKey& publicKey);
+    
     /// Get voting power for a participant
     uint64_t GetVotingPower(const VoterId& voter) const;
     
@@ -942,11 +945,26 @@ private:
     /// Calculate voting power snapshot for a proposal
     void SnapshotVotingPower(GovernanceProposal& proposal);
     
+    /// Get voter public key from registry
+    std::optional<PublicKey> GetVoterPublicKey(const VoterId& voter) const;
+    
+    /// Verify delegation signature
+    bool VerifyDelegationSignature(const Delegation& delegation, 
+                                    const std::vector<Byte>& signature) const;
+    
+    /// Verify guardian signature for veto
+    bool VerifyGuardianSignature(const VoterId& guardianId,
+                                  const GovernanceProposalId& proposalId,
+                                  const std::vector<Byte>& signature) const;
+    
     mutable std::mutex mutex_;
     
     // Storage
     std::map<GovernanceProposalId, GovernanceProposal> proposals_;
     std::map<GovernanceProposalId, std::map<VoterId, Vote>> votes_;
+    
+    // Voter public key registry (voter ID -> public key)
+    std::map<VoterId, PublicKey> voterKeys_;
     
     // Subsystems
     VotingPowerTracker votingPower_;

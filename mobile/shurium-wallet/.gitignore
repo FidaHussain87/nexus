@@ -1,52 +1,94 @@
-# Dependencies
-node_modules/
+# OSX
+.DS_Store
 
-# Build
+# Xcode
 build/
-dist/
-*.tsbuildinfo
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata
+*.xccheckout
+*.moved-aside
+DerivedData
+*.hmap
+*.ipa
+*.xcuserstate
+ios/.xcode.env.local
 
-# iOS
-ios/Pods/
-ios/build/
-*.xcworkspace
-*.xcodeproj/project.xcworkspace/
-*.xcodeproj/xcuserdata/
-
-# Android
-android/.gradle/
-android/build/
-android/app/build/
-android/app/debug/
-android/app/release/
-*.apk
-*.aab
+# Android/IntelliJ
+build/
+.idea
+.gradle
+local.properties
+*.iml
+*.hprof
+.cxx/
 *.keystore
 !debug.keystore
+
+# Android Studio generated files
+android/app/build/
+android/build/
+android/.gradle/
+android/app/.cxx/
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
 
 # Metro
 .metro-health-check*
 
+# Debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Fastlane
+**/fastlane/report.xml
+**/fastlane/Preview.html
+**/fastlane/screenshots
+**/fastlane/test_output
+
+# Bundle artifacts
+*.jsbundle
+*.android.bundle
+*.ios.bundle
+
+# CocoaPods
+ios/Pods/
+ios/Podfile.lock
+
+# Ruby
+ios/vendor/
+ios/.bundle/
+Gemfile.lock
+
+# Temporary files
+*.log
+*.tmp
+*.temp
+
+# TypeScript
+*.tsbuildinfo
+
 # Testing
 coverage/
+.jest/
 
-# IDE
-.idea/
-.vscode/
-*.iml
-
-# OS
-.DS_Store
-*.log
-
-# Env
+# Environment
 .env
 .env.*
+!.env.example
 
-# Bundle analysis
-*.hprof
+# VS Code
+.vscode/
 
-# Temporary
-*.swp
-*.swo
-*~
+# Release keystore (keep in secure location)
+android/app/shurium-release-key.keystore

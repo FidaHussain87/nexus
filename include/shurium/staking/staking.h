@@ -42,10 +42,10 @@ class RewardDistributor;
 // Staking Constants
 // ============================================================================
 
-/// Minimum stake to become a validator (100,000 NXS)
+/// Minimum stake to become a validator (100,000 SHR)
 constexpr Amount MIN_VALIDATOR_STAKE = 100000 * COIN;
 
-/// Minimum stake for delegation (100 NXS)
+/// Minimum stake for delegation (100 SHR)
 constexpr Amount MIN_DELEGATION_STAKE = 100 * COIN;
 
 /// Maximum validators in active set

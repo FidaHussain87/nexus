@@ -131,15 +131,15 @@ std::string FormatGovernanceAmount(Amount amount) {
         std::string s = ss.str();
         s.erase(s.find_last_not_of('0') + 1);
         if (s.back() == '.') s.pop_back();
-        return s + " NXS";
+        return s + " SHR";
     }
-    return ss.str() + " NXS";
+    return ss.str() + " SHR";
 }
 
 uint64_t CalculateVotingPower(Amount stake) {
     if (stake < MIN_VOTING_STAKE) return 0;
     // Square root voting power to prevent plutocracy
-    // 1 NXS = 1 base voting power, but diminishing returns
+    // 1 SHR = 1 base voting power, but diminishing returns
     double stakeInCoins = static_cast<double>(stake) / COIN;
     return static_cast<uint64_t>(std::sqrt(stakeInCoins) * 1000);
 }
@@ -1548,12 +1548,26 @@ bool GovernanceEngine::CastVote(const Vote& vote) {
     }
     
     // Verify vote signature
-    // Note: In production, would verify against voter's public key
-    // For testing/regtest, accept placeholder signatures (non-empty, can be all zeros)
     if (vote.signature.empty()) {
         return false;
     }
-    // Production would verify: vote.VerifySignature(voterPublicKey)
+    
+    // Get voter's public key from registry
+    auto voterKey = GetVoterPublicKey(vote.voter);
+    if (!voterKey) {
+        // Public key not registered - cannot verify signature
+        return false;
+    }
+    
+    // Verify the voter ID matches the public key hash
+    if (voterKey->GetID() != vote.voter) {
+        return false;
+    }
+    
+    // Verify the actual cryptographic signature
+    if (!vote.VerifySignature(*voterKey)) {
+        return false;
+    }
     
     // Record vote
     votes_[vote.proposalId][vote.voter] = vote;
@@ -1687,13 +1701,49 @@ bool GovernanceEngine::HasVoted(const GovernanceProposalId& proposalId, const Vo
 }
 
 bool GovernanceEngine::Delegate(const Delegation& delegation, const std::vector<Byte>& signature) {
-    (void)signature; // Would verify in production
+    // Verify the delegation signature from the delegator
+    if (!VerifyDelegationSignature(delegation, signature)) {
+        return false;
+    }
     return delegations_.AddDelegation(delegation);
 }
 
 bool GovernanceEngine::RevokeDelegation(const VoterId& delegator, const std::vector<Byte>& signature) {
-    (void)signature; // Would verify in production
+    // Get the delegation to verify
+    auto existingDelegation = delegations_.GetDelegation(delegator);
+    if (!existingDelegation) {
+        return false;
+    }
+    
+    // Verify signature from the delegator
+    // For revocation, we create a revocation message hash
+    auto voterKey = GetVoterPublicKey(delegator);
+    if (!voterKey) {
+        return false;
+    }
+    
+    // Create revocation message: hash of delegator + "revoke"
+    SHA256 hasher;
+    hasher.Write(delegator.data(), delegator.size());
+    const char* revokeStr = "revoke";
+    hasher.Write(reinterpret_cast<const Byte*>(revokeStr), 6);
+    std::array<Byte, 32> hashData;
+    hasher.Finalize(hashData.data());
+    Hash256 hash(hashData);
+    
+    if (!voterKey->Verify(hash, signature)) {
+        return false;
+    }
+    
     return delegations_.RemoveDelegation(delegator);
+}
+
+void GovernanceEngine::RegisterVoterKey(const PublicKey& publicKey) {
+    if (!publicKey.IsValid()) return;
+    
+    std::lock_guard<std::mutex> lock(mutex_);
+    VoterId voterId = publicKey.GetID();
+    voterKeys_[voterId] = publicKey;
 }
 
 void GovernanceEngine::UpdateVotingPower(const VoterId& voter, uint64_t power) {
@@ -1715,7 +1765,10 @@ ParameterValue GovernanceEngine::GetParameter(GovernableParameter param) const {
 bool GovernanceEngine::VetoProposal(const GovernanceProposalId& proposalId,
                                      const VoterId& guardianId,
                                      const std::vector<Byte>& signature) {
-    (void)signature; // Would verify in production
+    // Verify the guardian signature for this veto action
+    if (!VerifyGuardianSignature(guardianId, proposalId, signature)) {
+        return false;
+    }
     
     std::lock_guard<std::mutex> lock(mutex_);
     
@@ -2027,27 +2080,17 @@ bool GovernanceEngine::ExecuteConstitutionalChange(const ConstitutionalChange& c
 
 bool GovernanceEngine::VerifyProposalSignature(const GovernanceProposal& proposal,
                                                 const std::vector<Byte>& signature) const {
-    // For testing/regtest: accept any non-empty signature
-    // In production, this should verify actual cryptographic signature
+    // Signature must not be empty
     if (signature.empty()) {
         return false;
     }
     
-    // Check if this is a placeholder signature (all zeros) - accept for testing
-    bool isPlaceholder = true;
-    for (const auto& b : signature) {
-        if (b != 0) {
-            isPlaceholder = false;
-            break;
-        }
-    }
-    if (isPlaceholder && signature.size() >= 64) {
-        // Accept placeholder signatures for now (regtest mode)
-        // TODO: In production, require proper signature verification
-        return true;
+    // Proposer public key must be valid
+    if (!proposal.proposer.IsValid()) {
+        return false;
     }
     
-    // Verify actual signature
+    // Verify actual cryptographic signature against proposal hash
     Hash256 hash = proposal.CalculateHash();
     return proposal.proposer.Verify(hash, signature);
 }
@@ -2080,6 +2123,68 @@ bool GovernanceEngine::ValidateProposal(const GovernanceProposal& proposal) cons
 
 void GovernanceEngine::SnapshotVotingPower(GovernanceProposal& proposal) {
     proposal.totalVotingPower = votingPower_.GetTotalVotingPower();
+}
+
+std::optional<PublicKey> GovernanceEngine::GetVoterPublicKey(const VoterId& voter) const {
+    // Note: mutex_ should already be held by caller or this is called with lock
+    auto it = voterKeys_.find(voter);
+    if (it != voterKeys_.end()) {
+        return it->second;
+    }
+    return std::nullopt;
+}
+
+bool GovernanceEngine::VerifyDelegationSignature(const Delegation& delegation,
+                                                   const std::vector<Byte>& signature) const {
+    if (signature.empty()) {
+        return false;
+    }
+    
+    // Get the delegator's public key
+    auto delegatorKey = GetVoterPublicKey(delegation.delegator);
+    if (!delegatorKey) {
+        return false;
+    }
+    
+    // Verify the delegator's ID matches the public key hash
+    if (delegatorKey->GetID() != delegation.delegator) {
+        return false;
+    }
+    
+    // Verify signature over delegation hash
+    Hash256 delegationHash = delegation.GetHash();
+    return delegatorKey->Verify(delegationHash, signature);
+}
+
+bool GovernanceEngine::VerifyGuardianSignature(const VoterId& guardianId,
+                                                 const GovernanceProposalId& proposalId,
+                                                 const std::vector<Byte>& signature) const {
+    if (signature.empty()) {
+        return false;
+    }
+    
+    // Get the guardian info
+    auto guardian = guardians_.GetGuardian(guardianId);
+    if (!guardian || !guardian->isActive) {
+        return false;
+    }
+    
+    // Verify the guardian's public key matches their ID
+    if (guardian->publicKey.GetID() != guardianId) {
+        return false;
+    }
+    
+    // Create veto message hash: guardianId + proposalId + "veto"
+    SHA256 hasher;
+    hasher.Write(guardianId.data(), guardianId.size());
+    hasher.Write(proposalId.data(), proposalId.size());
+    const char* vetoStr = "veto";
+    hasher.Write(reinterpret_cast<const Byte*>(vetoStr), 4);
+    std::array<Byte, 32> hashData;
+    hasher.Finalize(hashData.data());
+    Hash256 hash(hashData);
+    
+    return guardian->publicKey.Verify(hash, signature);
 }
 
 } // namespace governance

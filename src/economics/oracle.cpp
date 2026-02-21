@@ -1109,18 +1109,38 @@ std::optional<AggregatedPrice> OraclePriceFeed::GetCurrentPrice() const {
 }
 
 std::optional<AggregatedPrice> OraclePriceFeed::GetPriceAtHeight(int height) const {
-    // Would need historical storage
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    if (!aggregator_) {
+        return std::nullopt;
+    }
+    
+    // The aggregator maintains the price history internally
+    // Since we don't have direct access to historical prices by height,
+    // and AggregatedPrice uses timestamps rather than block heights,
+    // we return the latest price if available.
+    // A full implementation would maintain a height-indexed price cache.
     (void)height;
-    return GetCurrentPrice();
+    
+    return aggregator_->GetLatestPrice();
 }
 
 std::vector<AggregatedPrice> OraclePriceFeed::GetPriceHistory(size_t count) const {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    // Would return from price history
-    (void)count;
-    std::vector<AggregatedPrice> result;
-    return result;
+    if (!aggregator_) {
+        return {};
+    }
+    
+    // Return the latest price if available
+    // A full implementation would expose the aggregator's priceHistory_ deque
+    // through a GetPriceHistory method on PriceAggregator
+    auto latestPrice = aggregator_->GetLatestPrice();
+    if (latestPrice && count > 0) {
+        return {*latestPrice};
+    }
+    
+    return {};
 }
 
 void OraclePriceFeed::OnPriceUpdate(PriceCallback callback) {

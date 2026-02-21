@@ -278,7 +278,7 @@
 │   │  ───────────────────────────────                                │   │
 │   │  Issue: What if someone creates fake identities for UBI?        │   │
 │   │  Mitigation:                                                    │   │
-│   │  • Verification process (details TBD)                           │   │
+│   │  • Multi-level verification (0-4) with trusted verifiers        │   │
 │   │  • Economic cost to create identities                           │   │
 │   │  • Community reporting mechanisms                               │   │
 │   │  • Progressive rollout with monitoring                          │   │

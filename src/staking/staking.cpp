@@ -124,9 +124,9 @@ std::string FormatStakeAmount(Amount amount) {
         std::string s = ss.str();
         s.erase(s.find_last_not_of('0') + 1);
         if (s.back() == '.') s.pop_back();
-        return s + " NXS";
+        return s + " SHR";
     }
-    return ss.str() + " NXS";
+    return ss.str() + " SHR";
 }
 
 Amount CalculateAnnualReward(Amount stake, int rateBps) {
@@ -218,14 +218,150 @@ Hash256 Validator::GetHash() const {
 
 std::vector<Byte> Validator::Serialize() const {
     std::vector<Byte> data;
-    // Stub
+    
+    // Version byte
+    data.push_back(0x01);
+    
+    // Validator ID (32 bytes)
+    data.insert(data.end(), id.begin(), id.end());
+    
+    // Operator key (compressed, 33 bytes)
+    auto keyBytes = operatorKey.ToVector();
+    uint8_t keyLen = static_cast<uint8_t>(keyBytes.size());
+    data.push_back(keyLen);
+    data.insert(data.end(), keyBytes.begin(), keyBytes.end());
+    
+    // Reward address (20 bytes)
+    data.insert(data.end(), rewardAddress.begin(), rewardAddress.end());
+    
+    // Moniker (length-prefixed string)
+    uint16_t monikerLen = static_cast<uint16_t>(std::min(moniker.size(), size_t(255)));
+    data.push_back(static_cast<Byte>(monikerLen & 0xFF));
+    data.push_back(static_cast<Byte>((monikerLen >> 8) & 0xFF));
+    data.insert(data.end(), moniker.begin(), moniker.begin() + monikerLen);
+    
+    // Status (1 byte)
+    data.push_back(static_cast<Byte>(status));
+    
+    // Self stake (8 bytes)
+    for (int i = 0; i < 8; ++i) {
+        data.push_back(static_cast<Byte>((selfStake >> (i * 8)) & 0xFF));
+    }
+    
+    // Delegated stake (8 bytes)
+    for (int i = 0; i < 8; ++i) {
+        data.push_back(static_cast<Byte>((delegatedStake >> (i * 8)) & 0xFF));
+    }
+    
+    // Commission rate (4 bytes)
+    for (int i = 0; i < 4; ++i) {
+        data.push_back(static_cast<Byte>((commissionRate >> (i * 8)) & 0xFF));
+    }
+    
+    // Registration height (4 bytes)
+    for (int i = 0; i < 4; ++i) {
+        data.push_back(static_cast<Byte>((registrationHeight >> (i * 8)) & 0xFF));
+    }
+    
+    // Jailed height (4 bytes)
+    for (int i = 0; i < 4; ++i) {
+        data.push_back(static_cast<Byte>((jailedHeight >> (i * 8)) & 0xFF));
+    }
+    
+    // Blocks produced (8 bytes)
+    for (int i = 0; i < 8; ++i) {
+        data.push_back(static_cast<Byte>((blocksProduced >> (i * 8)) & 0xFF));
+    }
+    
     return data;
 }
 
 std::optional<Validator> Validator::Deserialize(const Byte* data, size_t len) {
-    (void)data;
-    (void)len;
-    return std::nullopt;
+    if (!data || len < 80) {  // Minimum expected size
+        return std::nullopt;
+    }
+    
+    Validator validator;
+    size_t offset = 0;
+    
+    // Version check
+    Byte version = data[offset++];
+    if (version != 0x01) {
+        return std::nullopt;
+    }
+    
+    // Validator ID
+    if (offset + 32 > len) return std::nullopt;
+    std::copy(data + offset, data + offset + 32, validator.id.begin());
+    offset += 32;
+    
+    // Operator key
+    if (offset + 1 > len) return std::nullopt;
+    uint8_t keyLen = data[offset++];
+    if (offset + keyLen > len || keyLen > 65) return std::nullopt;
+    validator.operatorKey = PublicKey(data + offset, keyLen);
+    offset += keyLen;
+    
+    // Reward address
+    if (offset + 20 > len) return std::nullopt;
+    std::copy(data + offset, data + offset + 20, validator.rewardAddress.begin());
+    offset += 20;
+    
+    // Moniker
+    if (offset + 2 > len) return std::nullopt;
+    uint16_t monikerLen = data[offset] | (data[offset + 1] << 8);
+    offset += 2;
+    if (offset + monikerLen > len) return std::nullopt;
+    validator.moniker.assign(reinterpret_cast<const char*>(data + offset), monikerLen);
+    offset += monikerLen;
+    
+    // Status
+    if (offset + 1 > len) return std::nullopt;
+    validator.status = static_cast<ValidatorStatus>(data[offset++]);
+    
+    // Self stake
+    if (offset + 8 > len) return std::nullopt;
+    validator.selfStake = 0;
+    for (int i = 0; i < 8; ++i) {
+        validator.selfStake |= static_cast<Amount>(data[offset++]) << (i * 8);
+    }
+    
+    // Delegated stake
+    if (offset + 8 > len) return std::nullopt;
+    validator.delegatedStake = 0;
+    for (int i = 0; i < 8; ++i) {
+        validator.delegatedStake |= static_cast<Amount>(data[offset++]) << (i * 8);
+    }
+    
+    // Commission rate
+    if (offset + 4 > len) return std::nullopt;
+    validator.commissionRate = 0;
+    for (int i = 0; i < 4; ++i) {
+        validator.commissionRate |= static_cast<int>(data[offset++]) << (i * 8);
+    }
+    
+    // Registration height
+    if (offset + 4 > len) return std::nullopt;
+    validator.registrationHeight = 0;
+    for (int i = 0; i < 4; ++i) {
+        validator.registrationHeight |= static_cast<int>(data[offset++]) << (i * 8);
+    }
+    
+    // Jailed height
+    if (offset + 4 > len) return std::nullopt;
+    validator.jailedHeight = 0;
+    for (int i = 0; i < 4; ++i) {
+        validator.jailedHeight |= static_cast<int>(data[offset++]) << (i * 8);
+    }
+    
+    // Blocks produced
+    if (offset + 8 > len) return std::nullopt;
+    validator.blocksProduced = 0;
+    for (int i = 0; i < 8; ++i) {
+        validator.blocksProduced |= static_cast<uint64_t>(data[offset++]) << (i * 8);
+    }
+    
+    return validator;
 }
 
 std::string Validator::ToString() const {

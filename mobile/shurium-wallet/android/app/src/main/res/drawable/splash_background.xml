@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Background gradient -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="135"
+                android:startColor="#0A0A0F"
+                android:centerColor="#12121A"
+                android:endColor="#0A0A0F" />
+        </shape>
+    </item>
+    
+    <!-- Decorative gradient circle (top right) -->
+    <item
+        android:gravity="top|end"
+        android:top="-100dp"
+        android:right="-100dp">
+        <shape android:shape="oval">
+            <size android:width="300dp" android:height="300dp" />
+            <gradient
+                android:type="radial"
+                android:gradientRadius="150dp"
+                android:startColor="#336B5FFF"
+                android:endColor="#00000000" />
+        </shape>
+    </item>
+    
+    <!-- Decorative gradient circle (bottom left) -->
+    <item
+        android:gravity="bottom|start"
+        android:bottom="-150dp"
+        android:left="-150dp">
+        <shape android:shape="oval">
+            <size android:width="400dp" android:height="400dp" />
+            <gradient
+                android:type="radial"
+                android:gradientRadius="200dp"
+                android:startColor="#33A855F7"
+                android:endColor="#00000000" />
+        </shape>
+    </item>
+    
+    <!-- Center logo placeholder - will be replaced by React Native splash screen -->
+    <item android:gravity="center">
+        <shape android:shape="oval">
+            <size android:width="120dp" android:height="120dp" />
+            <gradient
+                android:type="radial"
+                android:gradientRadius="60dp"
+                android:startColor="#806B5FFF"
+                android:endColor="#406B5FFF" />
+        </shape>
+    </item>
+</layer-list>

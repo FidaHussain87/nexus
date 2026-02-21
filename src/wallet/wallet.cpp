@@ -889,9 +889,47 @@ bool Wallet::SignTransaction(MutableTransaction& tx, const IKeyStore& keystore) 
 }
 
 std::optional<TxHash> Wallet::BroadcastTransaction(const Transaction& tx) {
-    // This would need network connection
-    // For now, just return the hash as if broadcast succeeded
-    return tx.GetHash();
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    
+    // Validate transaction before attempting to broadcast
+    if (tx.vin.empty()) {
+        // Transaction has no inputs
+        return std::nullopt;
+    }
+    
+    if (tx.vout.empty()) {
+        // Transaction has no outputs
+        return std::nullopt;
+    }
+    
+    // Check that broadcast callback is configured
+    if (!broadcastCallback_) {
+        // No broadcast callback set - wallet is not connected to network
+        // This must be configured by the application layer via SetBroadcastCallback
+        return std::nullopt;
+    }
+    
+    // Call the broadcast callback which handles:
+    // 1. Mempool validation and submission
+    // 2. P2P relay to connected peers
+    auto [txid, error] = broadcastCallback_(tx);
+    
+    if (!txid) {
+        // Broadcast failed - error contains the reason
+        // Could log error here if logging is available
+        return std::nullopt;
+    }
+    
+    // Track the transaction in our wallet as pending/unconfirmed
+    auto txRef = std::make_shared<Transaction>(tx);
+    ProcessTransaction(txRef, -1);  // -1 = unconfirmed
+    
+    return txid;
+}
+
+void Wallet::SetBroadcastCallback(BroadcastCallback callback) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    broadcastCallback_ = std::move(callback);
 }
 
 std::vector<WalletTransaction> Wallet::GetTransactions() const {
@@ -1007,6 +1045,7 @@ bool Wallet::RegisterIdentity(const identity::IdentitySecrets& secrets) {
 
 std::pair<std::optional<economics::UBIClaim>, std::string> Wallet::CreateUBIClaim(
     identity::EpochId epoch,
+    const identity::VectorCommitment::MerkleProof& membershipProof,
     const Hash160& recipient) {
     
     std::lock_guard<std::recursive_mutex> lock(mutex_);
@@ -1022,6 +1061,12 @@ std::pair<std::optional<economics::UBIClaim>, std::string> Wallet::CreateUBIClai
     }
     
     const auto& secrets = *secretsOpt;
+    
+    // Validate membership proof is not empty
+    if (membershipProof.siblings.empty()) {
+        return {std::nullopt, "Invalid membership proof: proof path is empty. "
+                             "Obtain a valid membership proof from the identity manager."};
+    }
     
     // Determine recipient address
     Hash160 actualRecipient = recipient;
@@ -1041,17 +1086,19 @@ std::pair<std::optional<economics::UBIClaim>, std::string> Wallet::CreateUBIClai
         actualRecipient = keyHashes[0];
     }
     
-    // Create the UBI claim
-    // Note: In production, we would need a membership proof from the identity tree
-    // For now, we create a claim without the full proof (placeholder)
-    identity::VectorCommitment::MerkleProof emptyProof;
-    
+    // Create the UBI claim with the provided membership proof
     economics::UBIClaim claim = economics::UBIClaim::Create(
         epoch,
         secrets,
         actualRecipient,
-        emptyProof
+        membershipProof
     );
+    
+    // Verify the claim was created successfully (has a valid proof)
+    if (claim.status != economics::ClaimStatus::Pending) {
+        return {std::nullopt, "Failed to create UBI claim: " + 
+                             std::string(economics::ClaimStatusToString(claim.status))};
+    }
     
     return {claim, ""};
 }

@@ -38,7 +38,7 @@ class StabilityReserve;
 // Stability Constants
 // ============================================================================
 
-/// Target price in USD millicents (1 NXS = $1.00 = 100000 millicents)
+/// Target price in USD millicents (1 SHR = $1.00 = 100000 millicents)
 constexpr int64_t TARGET_PRICE_MILLICENTS = 100000;
 
 /// Price band width (+/- 5% from target)
@@ -415,7 +415,7 @@ private:
 /**
  * Manages the stability reserve fund.
  * 
- * The stability reserve holds NXS tokens that can be used to
+ * The stability reserve holds SHR tokens that can be used to
  * buy or sell to maintain price stability.
  */
 class StabilityReserve {
@@ -444,10 +444,10 @@ public:
     /// Calculate maximum spendable amount (balance - minimum)
     Amount GetSpendableAmount() const;
     
-    /// Record a buy operation (spent reserve to buy NXS)
+    /// Record a buy operation (spent reserve to buy SHR)
     void RecordBuy(Amount spent, Amount acquired);
     
-    /// Record a sell operation (sold NXS for reserve)
+    /// Record a sell operation (sold SHR for reserve)
     void RecordSell(Amount sold, Amount received);
     
     /// Get total bought all-time
@@ -464,7 +464,7 @@ public:
 
 private:
     Amount balance_{0};
-    Amount minimumBalance_{1000 * COIN}; // Default 1000 NXS minimum
+    Amount minimumBalance_{1000 * COIN}; // Default 1000 SHR minimum
     Amount totalBought_{0};
     Amount totalSold_{0};
     Amount totalSpent_{0};

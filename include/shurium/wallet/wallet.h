@@ -347,6 +347,14 @@ enum class WalletEvent {
 /// Wallet event callback
 using WalletCallback = std::function<void(WalletEvent event, const std::string& data)>;
 
+/// Broadcast callback type
+/// Called by wallet when a transaction needs to be broadcast to the network
+/// The callback should:
+/// 1. Validate and submit the transaction to the mempool
+/// 2. Relay the transaction to peers
+/// Returns the txid on success, or nullopt with error message on failure
+using BroadcastCallback = std::function<std::pair<std::optional<TxHash>, std::string>(const Transaction& tx)>;
+
 // ============================================================================
 // Wallet Balance
 // ============================================================================
@@ -632,10 +640,12 @@ public:
     
     /// Create UBI claim for the given epoch
     /// @param epoch The epoch to claim UBI for
+    /// @param membershipProof Merkle proof of identity membership in the identity tree
     /// @param recipient The address to receive the UBI (empty = use wallet address)
     /// @return The UBI claim if successful, empty optional with error message otherwise
     std::pair<std::optional<economics::UBIClaim>, std::string> CreateUBIClaim(
         identity::EpochId epoch,
+        const identity::VectorCommitment::MerkleProof& membershipProof,
         const Hash160& recipient = Hash160());
     
     /// Get identity commitment
@@ -664,6 +674,10 @@ public:
     
     /// Register event callback
     void OnEvent(WalletCallback callback);
+    
+    /// Set broadcast callback (required for BroadcastTransaction to work)
+    /// This should be set by the application layer to connect the wallet to the network
+    void SetBroadcastCallback(BroadcastCallback callback);
     
     /// Get wallet name
     const std::string& GetName() const { return config_.name; }
@@ -698,6 +712,9 @@ private:
     
     /// Event callbacks
     std::vector<WalletCallback> callbacks_;
+    
+    /// Broadcast callback (set by application layer)
+    BroadcastCallback broadcastCallback_;
     
     /// Emit event
     void EmitEvent(WalletEvent event, const std::string& data = "");

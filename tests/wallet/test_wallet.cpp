@@ -15,6 +15,8 @@
 #include <cstdlib>
 #include <ctime>
 #include <fstream>
+#include <atomic>
+#include <unistd.h>
 
 namespace shurium {
 namespace wallet {
@@ -765,12 +767,14 @@ class FileKeyStoreSerializationTest : public ::testing::Test {
 protected:
     void SetUp() override {
         testPassword_ = "TestPassword123!";
-        testMnemonic_ = "abandon abandon abandon abandon abandon abandon "
+         testMnemonic_ = "abandon abandon abandon abandon abandon abandon "
                         "abandon abandon abandon abandon abandon about";
-        // Create unique temp file path
-        tempPath_ = "/tmp/shurium_keystore_test_" + 
-                    std::to_string(std::time(nullptr)) + "_" +
-                    std::to_string(rand()) + ".dat";
+         // Create unique temp file path using PID, time, and counter
+         static std::atomic<int> counter{0};
+         tempPath_ = "/tmp/shurium_keystore_test_" + 
+                     std::to_string(getpid()) + "_" +
+                     std::to_string(std::time(nullptr)) + "_" +
+                     std::to_string(counter.fetch_add(1)) + ".dat";
     }
     
     void TearDown() override {
@@ -1044,10 +1048,12 @@ protected:
         testPassword_ = "TestPassword123!";
         testMnemonic_ = "abandon abandon abandon abandon abandon abandon "
                         "abandon abandon abandon abandon abandon about";
-        // Create unique temp file path
+        // Create unique temp file path using PID, time, and counter
+        static std::atomic<int> walletCounter{0};
         tempPath_ = "/tmp/shurium_wallet_test_" + 
+                    std::to_string(getpid()) + "_" +
                     std::to_string(std::time(nullptr)) + "_" +
-                    std::to_string(rand()) + ".wallet";
+                    std::to_string(walletCounter.fetch_add(1)) + ".wallet";
     }
     
     void TearDown() override {
@@ -1084,8 +1090,8 @@ TEST_F(WalletPersistenceTest, WalletWithAddressBookSaveLoad) {
         ASSERT_NE(wallet, nullptr);
         
         // Add address book entries
-        wallet->AddAddressBookEntry("nx1qtest123abc", "Test Contact", "send");
-        wallet->AddAddressBookEntry("nx1qtest456def", "Another Contact", "receive");
+        wallet->AddAddressBookEntry("shr1qtest123abc", "Test Contact", "send");
+        wallet->AddAddressBookEntry("shr1qtest456def", "Another Contact", "receive");
         
         auto entries = wallet->GetAddressBook();
         EXPECT_EQ(entries.size(), 2);
@@ -1253,7 +1259,7 @@ TEST_F(WalletTest, BuildTransactionInsufficientFunds) {
     ASSERT_NE(wallet, nullptr);
     
     auto builder = wallet->CreateTransaction();
-    builder.AddRecipient("nx1qtest", 100000);
+    builder.AddRecipient("shr1qtest", 100000);
     
     auto result = builder.Build();
     EXPECT_FALSE(result.success);
@@ -1263,12 +1269,12 @@ TEST_F(WalletTest, AddressBook) {
     auto wallet = Wallet::FromMnemonic(testMnemonic_, "", testPassword_);
     ASSERT_NE(wallet, nullptr);
     
-    wallet->AddAddressBookEntry("nx1qtest123", "Test Contact", "send");
+    wallet->AddAddressBookEntry("shr1qtest123", "Test Contact", "send");
     
     auto entries = wallet->GetAddressBook();
     EXPECT_EQ(entries.size(), 1);
     
-    auto found = wallet->LookupAddress("nx1qtest123");
+    auto found = wallet->LookupAddress("shr1qtest123");
     ASSERT_TRUE(found.has_value());
     EXPECT_EQ(found->label, "Test Contact");
 }

@@ -36,13 +36,13 @@ namespace RewardPercentage {
     constexpr int STABILITY = 5;           // Stability reserve
 }
 
-/// Initial block reward (500 NXS per block)
+/// Initial block reward (500 SHR per block)
 constexpr Amount INITIAL_BLOCK_REWARD = 500 * COIN;
 
 /// Block reward halving interval (every ~4 years at 30s blocks)
 constexpr int HALVING_INTERVAL = 4 * 365 * 24 * 120; // ~4,204,800 blocks
 
-/// Minimum block reward (1 NXS - never goes to zero)
+/// Minimum block reward (1 SHR - never goes to zero)
 constexpr Amount MINIMUM_BLOCK_REWARD = 1 * COIN;
 
 // ============================================================================
@@ -230,15 +230,19 @@ public:
     
     /// Build coinbase outputs for a block
     /// @param height Block height
-    /// @param minerAddress Address for work reward
-    /// @param ubiPoolAddress Address for UBI pool
-    /// @param ecosystemAddress Address for ecosystem fund
-    /// @param stabilityAddress Address for stability reserve
+    /// @param minerAddress Address for work reward (miner's share)
+    /// @param ubiPoolAddress Address for UBI pool (30%)
+    /// @param contributionsAddress Address for PoUW contributions reward (15%)
+    ///        This goes to the solver of the useful work problem, or to ecosystem
+    ///        if no PoUW solution was included in the block
+    /// @param ecosystemAddress Address for ecosystem fund (10%)
+    /// @param stabilityAddress Address for stability reserve (5%)
     /// @return Vector of output scripts and amounts
     std::vector<std::pair<std::vector<Byte>, Amount>> BuildCoinbase(
         int height,
         const Hash160& minerAddress,
         const Hash160& ubiPoolAddress,
+        const Hash160& contributionsAddress,
         const Hash160& ecosystemAddress,
         const Hash160& stabilityAddress
     ) const;
@@ -257,7 +261,7 @@ private:
 // Utility Functions
 // ============================================================================
 
-/// Format an amount as a human-readable string (e.g., "500.00 NXS")
+/// Format an amount as a human-readable string (e.g., "500.00 SHR")
 std::string FormatAmount(Amount amount, int decimals = 8);
 
 /// Parse an amount from string

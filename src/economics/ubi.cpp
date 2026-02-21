@@ -4,6 +4,7 @@
 
 #include <shurium/economics/ubi.h>
 #include <shurium/crypto/sha256.h>
+#include <shurium/crypto/field.h>
 
 #include <algorithm>
 #include <chrono>
@@ -49,15 +50,55 @@ UBIClaim UBIClaim::Create(
     // Generate nullifier for this epoch using the correct API
     claim.nullifier = secrets.DeriveNullifier(epoch);
     
-    // Generate ZK proof using the ProofGenerator
+    // Generate proper ZK proof using the ProofGenerator
     identity::ProofGenerator& generator = identity::ProofGenerator::Instance();
     
-    // Get the identity tree root from public inputs (would come from chain state)
-    // For now, we create a placeholder proof
-    identity::PublicInputs inputs;
-    inputs.Add(FieldElement::FromBytes(claim.nullifier.GetHash().data(), 32));
+    // Check if we have a valid membership proof
+    if (membershipProof.siblings.empty()) {
+        // No Merkle proof provided - cannot generate valid proof
+        // The claim will fail verification but we return it for error handling upstream
+        claim.status = ClaimStatus::InvalidProof;
+        return claim;
+    }
     
-    claim.proof = generator.GeneratePlaceholderProof(identity::ProofType::UBIClaim, inputs);
+    // Compute the identity root from the Merkle proof and commitment
+    // The root is computed by hashing up the path
+    identity::IdentityCommitment commitment = secrets.GetCommitment();
+    FieldElement currentHash = commitment.ToFieldElement();
+    
+    for (size_t i = 0; i < membershipProof.siblings.size(); ++i) {
+        // Hash with sibling based on path direction
+        Poseidon hasher;
+        if (i < membershipProof.pathBits.size() && membershipProof.pathBits[i]) {
+            // We're on the right, sibling is on the left
+            hasher.Absorb(membershipProof.siblings[i]);
+            hasher.Absorb(currentHash);
+        } else {
+            // We're on the left, sibling is on the right
+            hasher.Absorb(currentHash);
+            hasher.Absorb(membershipProof.siblings[i]);
+        }
+        currentHash = hasher.Squeeze();
+    }
+    FieldElement identityRoot = currentHash;
+    
+    // Generate the actual UBI claim proof using the proper proof generation
+    auto proofResult = generator.GenerateUBIClaimProof(
+        secrets.secretKey,
+        secrets.nullifierKey, 
+        secrets.trapdoor,
+        identityRoot,
+        membershipProof,
+        epoch
+    );
+    
+    if (proofResult) {
+        // Extract the ZK proof from the identity proof
+        claim.proof = proofResult->GetZKProof();
+    } else {
+        // Proof generation failed
+        claim.status = ClaimStatus::InvalidProof;
+    }
     
     return claim;
 }
@@ -265,16 +306,18 @@ void UBIDistributor::AddBlockReward(int height, Amount amount) {
     
     EpochId epoch = HeightToEpoch(height);
     
-    // If epoch changed, finalize the previous epoch(s)
+    // If epoch changed, check if previous epochs need finalization
+    // Note: Epochs must be explicitly finalized via FinalizeEpoch() 
+    // with the correct identity count from the IdentityManager.
+    // This function only updates the current epoch counter.
     if (epoch > currentEpoch_) {
-        // Finalize all epochs from currentEpoch_ to epoch-1
+        // Log warning if previous epochs are unfinalized
         for (EpochId e = currentEpoch_; e < epoch; ++e) {
             auto it = pools_.find(e);
             if (it != pools_.end() && !it->second.isFinalized) {
-                EpochUBIPool& prevPool = it->second;
-                prevPool.endHeight = EpochEndHeight(e);
-                prevPool.claimDeadline = prevPool.endHeight + UBI_CLAIM_WINDOW + (UBI_GRACE_EPOCHS * EPOCH_BLOCKS);
-                prevPool.Finalize(1);  // TODO: Get actual identity count from identity manager
+                // Warning: Previous epoch not finalized
+                // The node operator should ensure FinalizeEpoch is called
+                // with the correct identity count before advancing epochs.
             }
         }
     }
@@ -360,10 +403,51 @@ ClaimStatus UBIDistributor::ProcessClaim(
     }
     
     // Verify the ZK proof using the ProofVerifier
+    // The proof must demonstrate knowledge of identity secrets and membership
+    // in the identity tree with root `identityTreeRoot`
     identity::ProofVerifier& verifier = identity::ProofVerifier::Instance();
-    // For a real implementation, we would verify against the identity tree root
-    // For now, we do a basic structural check
+    
+    // First, check structural validity
     if (!claim.proof.IsValid()) {
+        claim.status = ClaimStatus::InvalidProof;
+        return claim.status;
+    }
+    
+    // Verify the proof type is UBI claim
+    if (claim.proof.GetType() != identity::ProofType::UBIClaim) {
+        claim.status = ClaimStatus::InvalidProof;
+        return claim.status;
+    }
+    
+    // Verify the proof's public inputs include the correct identity tree root
+    // Public inputs for UBI claim proof should be:
+    // [0] = identity tree root
+    // [1] = nullifier hash  
+    // [2] = epoch
+    const auto& publicInputs = claim.proof.GetPublicInputs();
+    if (publicInputs.Count() < 3) {
+        claim.status = ClaimStatus::InvalidProof;
+        return claim.status;
+    }
+    
+    // Convert identity tree root (Hash256) to FieldElement for comparison
+    FieldElement expectedRoot = FieldElement::FromBytes(identityTreeRoot.data(), identityTreeRoot.size());
+    
+    // Verify the root in public inputs matches expected identity tree root
+    if (publicInputs.values[0] != expectedRoot) {
+        claim.status = ClaimStatus::InvalidProof;
+        return claim.status;
+    }
+    
+    // Verify the epoch in public inputs matches claim epoch
+    FieldElement expectedEpoch(static_cast<uint64_t>(claim.epoch));
+    if (publicInputs.values[2] != expectedEpoch) {
+        claim.status = ClaimStatus::InvalidProof;
+        return claim.status;
+    }
+    
+    // Verify the ZK proof itself using the UBI claim circuit
+    if (!verifier.Verify(claim.proof, "ubi_claim")) {
         claim.status = ClaimStatus::InvalidProof;
         return claim.status;
     }
@@ -410,8 +494,42 @@ bool UBIDistributor::VerifyClaim(
         return false;
     }
     
-    // Verify the ZK proof
-    return claim.proof.IsValid();
+    // Verify the ZK proof against the identity tree root
+    // This performs the same verification as ProcessClaim but read-only
+    
+    // Check structural validity
+    if (!claim.proof.IsValid()) {
+        return false;
+    }
+    
+    // Verify the proof type is UBI claim
+    if (claim.proof.GetType() != identity::ProofType::UBIClaim) {
+        return false;
+    }
+    
+    // Verify the proof's public inputs
+    const auto& publicInputs = claim.proof.GetPublicInputs();
+    if (publicInputs.Count() < 3) {
+        return false;
+    }
+    
+    // Convert identity tree root to FieldElement for comparison
+    FieldElement expectedRoot = FieldElement::FromBytes(identityTreeRoot.data(), identityTreeRoot.size());
+    
+    // Verify the root in public inputs matches expected identity tree root
+    if (publicInputs.values[0] != expectedRoot) {
+        return false;
+    }
+    
+    // Verify the epoch in public inputs matches claim epoch
+    FieldElement expectedEpoch(static_cast<uint64_t>(claim.epoch));
+    if (publicInputs.values[2] != expectedEpoch) {
+        return false;
+    }
+    
+    // Verify the ZK proof itself using the UBI claim circuit
+    identity::ProofVerifier& verifier = identity::ProofVerifier::Instance();
+    return verifier.Verify(claim.proof, "ubi_claim");
 }
 
 bool UBIDistributor::IsEpochClaimable(EpochId epoch, int currentHeight) const {
@@ -471,17 +589,222 @@ std::vector<Byte> UBIDistributor::Serialize() const {
     std::lock_guard<std::mutex> lock(mutex_);
     
     std::vector<Byte> data;
-    // Implementation would serialize all pools and statistics
-    // Simplified for now
+    
+    // Version byte
+    data.push_back(0x01);
+    
+    // Current epoch (8 bytes)
+    uint64_t epoch64 = currentEpoch_;
+    for (int i = 0; i < 8; ++i) {
+        data.push_back(static_cast<Byte>((epoch64 >> (i * 8)) & 0xFF));
+    }
+    
+    // Number of pools (4 bytes)
+    uint32_t poolCount = static_cast<uint32_t>(pools_.size());
+    for (int i = 0; i < 4; ++i) {
+        data.push_back(static_cast<Byte>((poolCount >> (i * 8)) & 0xFF));
+    }
+    
+    // Serialize each pool
+    for (const auto& [epochId, pool] : pools_) {
+        // Epoch ID (8 bytes)
+        uint64_t e = epochId;
+        for (int i = 0; i < 8; ++i) {
+            data.push_back(static_cast<Byte>((e >> (i * 8)) & 0xFF));
+        }
+        
+        // Total pool (8 bytes)
+        int64_t tp = pool.totalPool;
+        for (int i = 0; i < 8; ++i) {
+            data.push_back(static_cast<Byte>((tp >> (i * 8)) & 0xFF));
+        }
+        
+        // Eligible count (4 bytes)
+        uint32_t ec = pool.eligibleCount;
+        for (int i = 0; i < 4; ++i) {
+            data.push_back(static_cast<Byte>((ec >> (i * 8)) & 0xFF));
+        }
+        
+        // Amount per person (8 bytes)
+        int64_t app = pool.amountPerPerson;
+        for (int i = 0; i < 8; ++i) {
+            data.push_back(static_cast<Byte>((app >> (i * 8)) & 0xFF));
+        }
+        
+        // Amount claimed (8 bytes)
+        int64_t ac = pool.amountClaimed;
+        for (int i = 0; i < 8; ++i) {
+            data.push_back(static_cast<Byte>((ac >> (i * 8)) & 0xFF));
+        }
+        
+        // Claim count (4 bytes)
+        uint32_t cc = pool.claimCount;
+        for (int i = 0; i < 4; ++i) {
+            data.push_back(static_cast<Byte>((cc >> (i * 8)) & 0xFF));
+        }
+        
+        // Flags: isFinalized (1 byte)
+        data.push_back(pool.isFinalized ? 0x01 : 0x00);
+        
+        // End height (4 bytes)
+        int32_t eh = pool.endHeight;
+        for (int i = 0; i < 4; ++i) {
+            data.push_back(static_cast<Byte>((eh >> (i * 8)) & 0xFF));
+        }
+        
+        // Claim deadline (4 bytes)
+        int32_t cd = pool.claimDeadline;
+        for (int i = 0; i < 4; ++i) {
+            data.push_back(static_cast<Byte>((cd >> (i * 8)) & 0xFF));
+        }
+        
+        // Number of used nullifiers (4 bytes)
+        uint32_t nullifierCount = static_cast<uint32_t>(pool.usedNullifiers.size());
+        for (int i = 0; i < 4; ++i) {
+            data.push_back(static_cast<Byte>((nullifierCount >> (i * 8)) & 0xFF));
+        }
+        
+        // Serialize each nullifier (32 bytes each)
+        for (const auto& nullifier : pool.usedNullifiers) {
+            const Byte* nullifierData = nullifier.data();
+            data.insert(data.end(), nullifierData, nullifierData + identity::Nullifier::SIZE);
+        }
+    }
+    
     return data;
 }
 
 bool UBIDistributor::Deserialize(const Byte* data, size_t len) {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    // Implementation would deserialize state
-    (void)data;
-    (void)len;
+    if (!data || len < 13) {  // Minimum: version(1) + epoch(8) + poolCount(4)
+        return false;
+    }
+    
+    size_t offset = 0;
+    
+    // Version byte
+    uint8_t version = data[offset++];
+    if (version != 0x01) {
+        return false;  // Unsupported version
+    }
+    
+    // Current epoch (8 bytes)
+    currentEpoch_ = 0;
+    for (int i = 0; i < 8; ++i) {
+        currentEpoch_ |= static_cast<EpochId>(data[offset++]) << (i * 8);
+    }
+    
+    // Number of pools (4 bytes)
+    uint32_t poolCount = 0;
+    for (int i = 0; i < 4; ++i) {
+        poolCount |= static_cast<uint32_t>(data[offset++]) << (i * 8);
+    }
+    
+    // Sanity check
+    if (poolCount > 10000) {
+        return false;  // Too many pools
+    }
+    
+    // Clear existing pools
+    pools_.clear();
+    
+    // Deserialize each pool
+    for (uint32_t p = 0; p < poolCount; ++p) {
+        if (offset + 53 > len) {  // Minimum pool size without nullifiers
+            return false;
+        }
+        
+        EpochUBIPool pool;
+        
+        // Epoch ID (8 bytes)
+        EpochId epochId = 0;
+        for (int i = 0; i < 8; ++i) {
+            epochId |= static_cast<EpochId>(data[offset++]) << (i * 8);
+        }
+        pool.epoch = epochId;
+        
+        // Total pool (8 bytes)
+        int64_t tp = 0;
+        for (int i = 0; i < 8; ++i) {
+            tp |= static_cast<int64_t>(data[offset++]) << (i * 8);
+        }
+        pool.totalPool = tp;
+        
+        // Eligible count (4 bytes)
+        uint32_t ec = 0;
+        for (int i = 0; i < 4; ++i) {
+            ec |= static_cast<uint32_t>(data[offset++]) << (i * 8);
+        }
+        pool.eligibleCount = ec;
+        
+        // Amount per person (8 bytes)
+        int64_t app = 0;
+        for (int i = 0; i < 8; ++i) {
+            app |= static_cast<int64_t>(data[offset++]) << (i * 8);
+        }
+        pool.amountPerPerson = app;
+        
+        // Amount claimed (8 bytes)
+        int64_t ac = 0;
+        for (int i = 0; i < 8; ++i) {
+            ac |= static_cast<int64_t>(data[offset++]) << (i * 8);
+        }
+        pool.amountClaimed = ac;
+        
+        // Claim count (4 bytes)
+        uint32_t cc = 0;
+        for (int i = 0; i < 4; ++i) {
+            cc |= static_cast<uint32_t>(data[offset++]) << (i * 8);
+        }
+        pool.claimCount = cc;
+        
+        // Flags: isFinalized (1 byte)
+        pool.isFinalized = (data[offset++] != 0);
+        
+        // End height (4 bytes)
+        int32_t eh = 0;
+        for (int i = 0; i < 4; ++i) {
+            eh |= static_cast<int32_t>(data[offset++]) << (i * 8);
+        }
+        pool.endHeight = eh;
+        
+        // Claim deadline (4 bytes)
+        int32_t cd = 0;
+        for (int i = 0; i < 4; ++i) {
+            cd |= static_cast<int32_t>(data[offset++]) << (i * 8);
+        }
+        pool.claimDeadline = cd;
+        
+        // Number of used nullifiers (4 bytes)
+        uint32_t nullifierCount = 0;
+        for (int i = 0; i < 4; ++i) {
+            nullifierCount |= static_cast<uint32_t>(data[offset++]) << (i * 8);
+        }
+        
+        // Sanity check
+        if (nullifierCount > 1000000) {
+            return false;  // Too many nullifiers
+        }
+        
+        // Check we have enough data for nullifiers
+        if (offset + nullifierCount * identity::Nullifier::SIZE > len) {
+            return false;
+        }
+        
+        // Deserialize each nullifier (32 bytes each)
+        for (uint32_t n = 0; n < nullifierCount; ++n) {
+            identity::NullifierHash hash;
+            std::memcpy(hash.data(), data + offset, identity::Nullifier::SIZE);
+            offset += identity::Nullifier::SIZE;
+            
+            identity::Nullifier nullifier(hash, epochId);
+            pool.usedNullifiers.insert(nullifier);
+        }
+        
+        pools_[epochId] = std::move(pool);
+    }
+    
     return true;
 }
 

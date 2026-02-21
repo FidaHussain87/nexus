@@ -40,7 +40,7 @@ class TreasuryProposal;
 // Treasury Constants
 // ============================================================================
 
-/// Minimum proposal amount (1000 NXS)
+/// Minimum proposal amount (1000 SHR)
 constexpr Amount MIN_PROPOSAL_AMOUNT = 1000 * COIN;
 
 /// Maximum single proposal amount (10% of treasury)
@@ -483,6 +483,10 @@ public:
     using VotingPowerCalculator = std::function<uint64_t(const PublicKey&)>;
     void SetVotingPowerCalculator(VotingPowerCalculator calculator);
     
+    /// Set total voting power calculator (returns total stake in the system)
+    using TotalVotingPowerCalculator = std::function<uint64_t()>;
+    void SetTotalVotingPowerCalculator(TotalVotingPowerCalculator calculator);
+    
     // ========================================================================
     // Period Management
     // ========================================================================
@@ -587,6 +591,9 @@ private:
     
     /// Voting power calculator
     VotingPowerCalculator votingPowerCalculator_;
+    
+    /// Total voting power calculator (returns total staked amount)
+    TotalVotingPowerCalculator totalVotingPowerCalculator_;
     
     /// Mutex for thread safety
     mutable std::mutex mutex_;

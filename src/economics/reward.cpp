@@ -204,6 +204,7 @@ std::vector<std::pair<std::vector<Byte>, Amount>> CoinbaseBuilder::BuildCoinbase
     int height,
     const Hash160& minerAddress,
     const Hash160& ubiPoolAddress,
+    const Hash160& contributionsAddress,
     const Hash160& ecosystemAddress,
     const Hash160& stabilityAddress
 ) const {
@@ -234,10 +235,10 @@ std::vector<std::pair<std::vector<Byte>, Amount>> CoinbaseBuilder::BuildCoinbase
         outputs.emplace_back(makeP2PKH(ubiPoolAddress), dist.ubiPool);
     }
     
-    // Contributions - for now, goes to ecosystem
-    // In production, this would be distributed to validators of useful work
+    // Contributions reward - goes to the PoUW solution provider
+    // This incentivizes providing useful computational work
     if (dist.contributions > 0) {
-        outputs.emplace_back(makeP2PKH(ecosystemAddress), dist.contributions);
+        outputs.emplace_back(makeP2PKH(contributionsAddress), dist.contributions);
     }
     
     // Ecosystem development
@@ -280,7 +281,7 @@ bool CoinbaseBuilder::VerifyCoinbase(
 // ============================================================================
 
 std::string FormatAmount(Amount amount, int decimals) {
-    // Amount is in satoshis (100,000,000 = 1 NXS)
+    // Amount is in satoshis (100,000,000 = 1 SHR)
     constexpr Amount SATOSHIS_PER_COIN = 100000000;
     
     bool negative = amount < 0;
@@ -307,7 +308,7 @@ std::string FormatAmount(Amount amount, int decimals) {
         ss << fracStr.substr(0, decimals);
     }
     
-    ss << " NXS";
+    ss << " SHR";
     return ss.str();
 }
 

@@ -6,6 +6,7 @@
 import { Buffer } from 'buffer';
 import * as bip39 from 'bip39';
 import { NetworkType } from '../types';
+import Crypto from 'react-native-quick-crypto';
 
 // SHURIUM address prefixes by network
 const ADDRESS_PREFIXES: Record<NetworkType, { pubkey: number; script: number }> = {
@@ -126,23 +127,21 @@ export function base58CheckDecode(address: string): { version: number; payload: 
 }
 
 /**
- * Double SHA256 hash
+ * Double SHA256 hash using react-native-quick-crypto
  */
 export function doubleSha256(data: Buffer): Buffer {
-  // Note: In production, use react-native-quick-crypto for performance
-  // This is a placeholder that will be replaced with native implementation
-  const crypto = require('crypto');
-  const first = crypto.createHash('sha256').update(data).digest();
-  return crypto.createHash('sha256').update(first).digest();
+  const first = Crypto.createHash('sha256').update(data as unknown as ArrayBuffer).digest();
+  const second = Crypto.createHash('sha256').update(first as unknown as ArrayBuffer).digest();
+  return Buffer.from(second);
 }
 
 /**
- * RIPEMD160(SHA256(data))
+ * RIPEMD160(SHA256(data)) using react-native-quick-crypto
  */
 export function hash160(data: Buffer): Buffer {
-  const crypto = require('crypto');
-  const sha256 = crypto.createHash('sha256').update(data).digest();
-  return crypto.createHash('ripemd160').update(sha256).digest();
+  const sha256 = Crypto.createHash('sha256').update(data as unknown as ArrayBuffer).digest();
+  const ripemd160 = Crypto.createHash('ripemd160').update(sha256 as unknown as ArrayBuffer).digest();
+  return Buffer.from(ripemd160);
 }
 
 /**
@@ -259,9 +258,9 @@ export function parseSHR(shr: string | number): number {
 }
 
 /**
- * Generate a random hex string
+ * Generate a random hex string using react-native-quick-crypto
  */
 export function randomHex(bytes: number): string {
-  const crypto = require('crypto');
-  return crypto.randomBytes(bytes).toString('hex');
+  const randomBytes = Crypto.randomBytes(bytes);
+  return Buffer.from(randomBytes).toString('hex');
 }

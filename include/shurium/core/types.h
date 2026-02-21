@@ -33,8 +33,8 @@ using Amount = int64_t;
 using Timestamp = int64_t;
 
 /// Constants
-constexpr Amount COIN = 100000000LL;  // 1 NXS = 100 million base units
-constexpr Amount MAX_MONEY = 21000000000LL * COIN;  // 21 billion NXS max
+constexpr Amount COIN = 100000000LL;  // 1 SHR = 100 million base units
+constexpr Amount MAX_MONEY = 21000000000LL * COIN;  // 21 billion SHR max
 
 /// Check if amount is in valid range
 inline bool MoneyRange(Amount value) {

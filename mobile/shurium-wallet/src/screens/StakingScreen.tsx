@@ -1,9 +1,9 @@
 /**
  * SHURIUM Mobile Wallet - Staking Screen
- * Manage staking, delegations, and rewards
+ * Premium glassmorphism design for staking management
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,14 +12,24 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
-  ActivityIndicator,
   RefreshControl,
   Modal,
+  Animated,
+  Pressable,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { useWalletStore } from '../store/wallet';
+import { colors, gradients, spacing, radius, shadows, typography } from '../theme';
+import { GlassCard, GradientButton, PulsingDot, StatusPill, ProgressRing } from '../components/ui';
 import type { ValidatorInfo, DelegationInfo } from '../types';
 
 type TabType = 'overview' | 'validators' | 'delegations';
+
+const TAB_ITEMS: { key: TabType; label: string; icon: string }[] = [
+  { key: 'overview', label: 'Overview', icon: '📊' },
+  { key: 'validators', label: 'Validators', icon: '🔐' },
+  { key: 'delegations', label: 'My Stakes', icon: '💎' },
+];
 
 export const StakingScreen: React.FC = () => {
   const {
@@ -37,15 +47,43 @@ export const StakingScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Delegation modal state
+  // Modal state
   const [showDelegateModal, setShowDelegateModal] = useState(false);
   const [selectedValidator, setSelectedValidator] = useState<ValidatorInfo | null>(null);
   const [delegateAmount, setDelegateAmount] = useState('');
   const [isUnstaking, setIsUnstaking] = useState(false);
 
+  // Animations
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+  const tabIndicatorAnim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     refreshStakingInfo();
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        damping: 15,
+        stiffness: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
+
+  useEffect(() => {
+    const tabIndex = TAB_ITEMS.findIndex(t => t.key === activeTab);
+    Animated.spring(tabIndicatorAnim, {
+      toValue: tabIndex,
+      damping: 20,
+      stiffness: 150,
+      useNativeDriver: true,
+    }).start();
+  }, [activeTab]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -167,72 +205,107 @@ export const StakingScreen: React.FC = () => {
     setShowDelegateModal(true);
   };
 
+  // ============================================================================
+  // Overview Tab
+  // ============================================================================
   const renderOverview = () => (
-    <View style={styles.overviewContainer}>
-      {/* Staking Status */}
-      <View style={styles.statusCard}>
-        <View style={styles.statusRow}>
-          <View style={[styles.statusDot, { 
-            backgroundColor: stakingInfo?.isStaking ? '#4CAF50' : '#666' 
-          }]} />
-          <Text style={styles.statusText}>
-            {stakingInfo?.isStaking ? 'Staking Active' : 'Not Staking'}
-          </Text>
+    <Animated.View style={[styles.tabContent, { opacity: fadeAnim }]}>
+      {/* Staking Status Card */}
+      <GlassCard style={styles.statusCard} intensity="medium" glow={stakingInfo?.isStaking}>
+        <LinearGradient
+          colors={stakingInfo?.isStaking 
+            ? ['rgba(16, 185, 129, 0.15)', 'rgba(16, 185, 129, 0.05)']
+            : ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        />
+        <View style={styles.statusHeader}>
+          <StatusPill 
+            status={stakingInfo?.isStaking ? 'success' : 'info'} 
+            text={stakingInfo?.isStaking ? 'Staking Active' : 'Not Staking'} 
+          />
         </View>
-      </View>
+      </GlassCard>
 
-      {/* Staking Stats */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
+      {/* Stats Grid */}
+      <View style={styles.statsGrid}>
+        <GlassCard style={styles.statCard} intensity="light">
+          <LinearGradient
+            colors={['rgba(139, 92, 246, 0.1)', 'rgba(59, 130, 246, 0.1)']}
+            style={StyleSheet.absoluteFill}
+          />
+          <Text style={styles.statIcon}>💎</Text>
           <Text style={styles.statLabel}>Total Staked</Text>
-          <Text style={styles.statValue}>
-            {stakingInfo?.totalStaked || '0'} SHR
-          </Text>
-        </View>
+          <Text style={styles.statValue}>{stakingInfo?.totalStaked || '0'}</Text>
+          <Text style={styles.statCurrency}>SHR</Text>
+        </GlassCard>
         
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Available Rewards</Text>
-          <Text style={[styles.statValue, { color: '#4CAF50' }]}>
-            {stakingInfo?.rewards || '0'} SHR
+        <GlassCard style={styles.statCard} intensity="light">
+          <LinearGradient
+            colors={['rgba(16, 185, 129, 0.1)', 'rgba(16, 185, 129, 0.05)']}
+            style={StyleSheet.absoluteFill}
+          />
+          <Text style={styles.statIcon}>🎁</Text>
+          <Text style={styles.statLabel}>Rewards</Text>
+          <Text style={[styles.statValue, { color: colors.success.base }]}>
+            {stakingInfo?.rewards || '0'}
           </Text>
-        </View>
+          <Text style={styles.statCurrency}>SHR</Text>
+        </GlassCard>
       </View>
 
       {/* Claim Rewards Button */}
       {parseFloat(stakingInfo?.rewards || '0') > 0 && (
-        <TouchableOpacity 
-          style={styles.claimButton}
-          onPress={handleClaimRewards}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.claimButtonText}>
-              Claim {stakingInfo?.rewards} SHR
-            </Text>
-          )}
-        </TouchableOpacity>
+        <Pressable onPress={handleClaimRewards} disabled={isLoading}>
+          <LinearGradient
+            colors={gradients.success}
+            style={styles.claimButton}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          >
+            {isLoading ? (
+              <PulsingDot />
+            ) : (
+              <>
+                <Text style={styles.claimIcon}>🎁</Text>
+                <Text style={styles.claimButtonText}>
+                  Claim {stakingInfo?.rewards} SHR
+                </Text>
+              </>
+            )}
+          </LinearGradient>
+        </Pressable>
       )}
 
-      {/* Quick Delegate */}
-      <View style={styles.quickActions}>
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <TouchableOpacity 
-          style={styles.quickActionButton}
-          onPress={() => setActiveTab('validators')}
-        >
-          <Text style={styles.quickActionText}>Find Validators to Stake</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Quick Action */}
+      <GlassCard style={styles.quickActionCard} intensity="light">
+        <View style={styles.quickActionHeader}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+        </View>
+        <Pressable onPress={() => setActiveTab('validators')}>
+          <LinearGradient
+            colors={gradients.primary}
+            style={styles.quickActionButton}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          >
+            <Text style={styles.quickActionIcon}>🔐</Text>
+            <Text style={styles.quickActionText}>Find Validators to Stake</Text>
+            <Text style={styles.quickActionArrow}>→</Text>
+          </LinearGradient>
+        </Pressable>
+      </GlassCard>
 
-      {/* My Delegations Summary */}
+      {/* Delegations Summary */}
       {stakingInfo?.delegations && stakingInfo.delegations.length > 0 && (
-        <View style={styles.delegationsSummary}>
+        <GlassCard style={styles.delegationsSummary} intensity="light">
           <Text style={styles.sectionTitle}>Active Delegations</Text>
           {stakingInfo.delegations.slice(0, 3).map((del, index) => (
             <View key={index} style={styles.delegationItem}>
-              <Text style={styles.delegationValidator}>{del.validatorName}</Text>
+              <View style={styles.delegationInfo}>
+                <Text style={styles.delegationValidator}>{del.validatorName}</Text>
+              </View>
               <Text style={styles.delegationAmount}>{del.amount} SHR</Text>
             </View>
           ))}
@@ -243,41 +316,53 @@ export const StakingScreen: React.FC = () => {
               </Text>
             </TouchableOpacity>
           )}
-        </View>
+        </GlassCard>
       )}
-    </View>
+    </Animated.View>
   );
 
+  // ============================================================================
+  // Validators Tab
+  // ============================================================================
   const renderValidators = () => (
-    <View style={styles.validatorsContainer}>
+    <Animated.View style={[styles.tabContent, { opacity: fadeAnim }]}>
       {!stakingInfo?.validators || stakingInfo.validators.length === 0 ? (
-        <View style={styles.emptyState}>
+        <GlassCard style={styles.emptyState} intensity="light">
+          <Text style={styles.emptyIcon}>🔍</Text>
           <Text style={styles.emptyText}>No validators found</Text>
           <Text style={styles.emptySubtext}>
             Pull to refresh or check your connection
           </Text>
-        </View>
+        </GlassCard>
       ) : (
         stakingInfo.validators.map((validator) => (
-          <TouchableOpacity
-            key={validator.id}
-            style={styles.validatorCard}
-            onPress={() => openDelegateModal(validator, false)}
-          >
+          <GlassCard key={validator.id} style={styles.validatorCard} intensity="light">
+            <LinearGradient
+              colors={['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']}
+              style={StyleSheet.absoluteFill}
+            />
             <View style={styles.validatorHeader}>
               <View style={styles.validatorInfo}>
-                <Text style={styles.validatorName}>{validator.name}</Text>
-                <Text style={styles.validatorAddress} numberOfLines={1}>
-                  {validator.address}
-                </Text>
+                <View style={styles.validatorNameRow}>
+                  <View style={styles.validatorIcon}>
+                    <Text>🔐</Text>
+                  </View>
+                  <View>
+                    <Text style={styles.validatorName}>{validator.name}</Text>
+                    <Text style={styles.validatorAddress} numberOfLines={1}>
+                      {validator.address.substring(0, 16)}...
+                    </Text>
+                  </View>
+                </View>
               </View>
-              <View style={[styles.validatorStatus, { 
-                backgroundColor: validator.isActive ? '#4CAF50' : '#F44336' 
-              }]}>
+              <LinearGradient
+                colors={validator.isActive ? gradients.success : ['#EF4444', '#DC2626']}
+                style={styles.validatorStatus}
+              >
                 <Text style={styles.validatorStatusText}>
                   {validator.isActive ? 'Active' : 'Inactive'}
                 </Text>
-              </View>
+              </LinearGradient>
             </View>
             
             <View style={styles.validatorStats}>
@@ -295,65 +380,82 @@ export const StakingScreen: React.FC = () => {
               </View>
               <View style={styles.validatorStat}>
                 <Text style={styles.validatorStatLabel}>Uptime</Text>
-                <Text style={styles.validatorStatValue}>{validator.uptime}%</Text>
-              </View>
-            </View>
-
-            <TouchableOpacity 
-              style={styles.delegateButton}
-              onPress={() => openDelegateModal(validator, false)}
-            >
-              <Text style={styles.delegateButtonText}>Delegate</Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        ))
-      )}
-    </View>
-  );
-
-  const renderDelegations = () => (
-    <View style={styles.delegationsContainer}>
-      {!stakingInfo?.delegations || stakingInfo.delegations.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No active delegations</Text>
-          <Text style={styles.emptySubtext}>
-            Stake SHR with validators to earn rewards
-          </Text>
-          <TouchableOpacity 
-            style={styles.startStakingButton}
-            onPress={() => setActiveTab('validators')}
-          >
-            <Text style={styles.startStakingText}>Start Staking</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        stakingInfo.delegations.map((delegation, index) => (
-          <View key={index} style={styles.delegationCard}>
-            <View style={styles.delegationHeader}>
-              <Text style={styles.delegationValidatorName}>
-                {delegation.validatorName}
-              </Text>
-              <Text style={styles.delegationRewards}>
-                +{delegation.rewards} SHR
-              </Text>
-            </View>
-            
-            <View style={styles.delegationDetails}>
-              <View style={styles.delegationDetail}>
-                <Text style={styles.delegationDetailLabel}>Staked Amount</Text>
-                <Text style={styles.delegationDetailValue}>{delegation.amount} SHR</Text>
-              </View>
-              <View style={styles.delegationDetail}>
-                <Text style={styles.delegationDetailLabel}>Started</Text>
-                <Text style={styles.delegationDetailValue}>
-                  {new Date(delegation.startTime * 1000).toLocaleDateString()}
+                <Text style={[styles.validatorStatValue, { color: colors.success.base }]}>
+                  {validator.uptime}%
                 </Text>
               </View>
             </View>
 
+            <Pressable onPress={() => openDelegateModal(validator, false)}>
+              <LinearGradient
+                colors={gradients.primary}
+                style={styles.delegateButton}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Text style={styles.delegateButtonText}>Delegate</Text>
+              </LinearGradient>
+            </Pressable>
+          </GlassCard>
+        ))
+      )}
+    </Animated.View>
+  );
+
+  // ============================================================================
+  // Delegations Tab
+  // ============================================================================
+  const renderDelegations = () => (
+    <Animated.View style={[styles.tabContent, { opacity: fadeAnim }]}>
+      {!stakingInfo?.delegations || stakingInfo.delegations.length === 0 ? (
+        <GlassCard style={styles.emptyState} intensity="light">
+          <Text style={styles.emptyIcon}>💎</Text>
+          <Text style={styles.emptyText}>No active delegations</Text>
+          <Text style={styles.emptySubtext}>
+            Stake SHR with validators to earn rewards
+          </Text>
+          <Pressable onPress={() => setActiveTab('validators')}>
+            <LinearGradient
+              colors={gradients.primary}
+              style={styles.startStakingButton}
+            >
+              <Text style={styles.startStakingText}>Start Staking</Text>
+            </LinearGradient>
+          </Pressable>
+        </GlassCard>
+      ) : (
+        stakingInfo.delegations.map((delegation, index) => (
+          <GlassCard key={index} style={styles.delegationCard} intensity="light">
+            <LinearGradient
+              colors={['rgba(139, 92, 246, 0.05)', 'rgba(59, 130, 246, 0.05)']}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={styles.delegationCardHeader}>
+              <View>
+                <Text style={styles.delegationValidatorName}>
+                  {delegation.validatorName}
+                </Text>
+                <Text style={styles.delegationStarted}>
+                  Since {new Date(delegation.startTime * 1000).toLocaleDateString()}
+                </Text>
+              </View>
+              <View style={styles.delegationRewardsBadge}>
+                <Text style={styles.delegationRewardsText}>
+                  +{delegation.rewards} SHR
+                </Text>
+              </View>
+            </View>
+            
+            <View style={styles.delegationDetails}>
+              <View style={styles.delegationDetailItem}>
+                <Text style={styles.delegationDetailLabel}>Staked</Text>
+                <Text style={styles.delegationDetailValue}>{delegation.amount} SHR</Text>
+              </View>
+            </View>
+
             <View style={styles.delegationActions}>
-              <TouchableOpacity 
-                style={[styles.delegationAction, styles.delegationActionAdd]}
+              <Pressable 
+                style={styles.delegationActionWrapper}
                 onPress={() => {
                   const validator = stakingInfo?.validators?.find(
                     v => v.id === delegation.validatorId
@@ -361,10 +463,15 @@ export const StakingScreen: React.FC = () => {
                   if (validator) openDelegateModal(validator, false);
                 }}
               >
-                <Text style={styles.delegationActionText}>Add More</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.delegationAction, styles.delegationActionRemove]}
+                <LinearGradient
+                  colors={gradients.primary}
+                  style={styles.delegationAction}
+                >
+                  <Text style={styles.delegationActionText}>Add More</Text>
+                </LinearGradient>
+              </Pressable>
+              <Pressable 
+                style={styles.delegationActionWrapper}
                 onPress={() => {
                   const validator = stakingInfo?.validators?.find(
                     v => v.id === delegation.validatorId
@@ -372,57 +479,95 @@ export const StakingScreen: React.FC = () => {
                   if (validator) openDelegateModal(validator, true);
                 }}
               >
-                <Text style={styles.delegationActionText}>Undelegate</Text>
-              </TouchableOpacity>
+                <LinearGradient
+                  colors={['#EF4444', '#DC2626']}
+                  style={styles.delegationAction}
+                >
+                  <Text style={styles.delegationActionText}>Undelegate</Text>
+                </LinearGradient>
+              </Pressable>
             </View>
-          </View>
+          </GlassCard>
         ))
       )}
-    </View>
+    </Animated.View>
   );
 
   return (
     <View style={styles.container}>
+      {/* Background */}
+      <View style={styles.backgroundOrbs}>
+        <Animated.View style={[styles.orb, styles.orb1, { opacity: fadeAnim }]} />
+        <Animated.View style={[styles.orb, styles.orb2, { opacity: fadeAnim }]} />
+      </View>
+
       {/* Error Banner */}
       {lastError && (
         <TouchableOpacity style={styles.errorBanner} onPress={clearError}>
+          <LinearGradient
+            colors={['#EF4444', '#DC2626']}
+            style={StyleSheet.absoluteFill}
+          />
           <Text style={styles.errorText}>{lastError}</Text>
         </TouchableOpacity>
       )}
 
-      {/* Tab Navigation */}
-      <View style={styles.tabBar}>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'overview' && styles.activeTab]}
-          onPress={() => setActiveTab('overview')}
-        >
-          <Text style={[styles.tabText, activeTab === 'overview' && styles.activeTabText]}>
-            Overview
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'validators' && styles.activeTab]}
-          onPress={() => setActiveTab('validators')}
-        >
-          <Text style={[styles.tabText, activeTab === 'validators' && styles.activeTabText]}>
-            Validators
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'delegations' && styles.activeTab]}
-          onPress={() => setActiveTab('delegations')}
-        >
-          <Text style={[styles.tabText, activeTab === 'delegations' && styles.activeTabText]}>
-            My Stakes
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {/* Tab Bar */}
+      <GlassCard style={styles.tabBar} intensity="medium">
+        <View style={styles.tabsContainer}>
+          {TAB_ITEMS.map((tab, index) => (
+            <Pressable 
+              key={tab.key}
+              style={styles.tab}
+              onPress={() => setActiveTab(tab.key)}
+            >
+              <Text style={[
+                styles.tabIcon,
+                activeTab === tab.key && styles.tabIconActive
+              ]}>
+                {tab.icon}
+              </Text>
+              <Text style={[
+                styles.tabText, 
+                activeTab === tab.key && styles.tabTextActive
+              ]}>
+                {tab.label}
+              </Text>
+            </Pressable>
+          ))}
+          <Animated.View 
+            style={[
+              styles.tabIndicator,
+              {
+                transform: [{
+                  translateX: tabIndicatorAnim.interpolate({
+                    inputRange: [0, 1, 2],
+                    outputRange: [0, 110, 220],
+                  }),
+                }],
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={gradients.primary}
+              style={styles.tabIndicatorGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            />
+          </Animated.View>
+        </View>
+      </GlassCard>
 
       {/* Content */}
       <ScrollView
-        style={styles.content}
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            tintColor={colors.primary.start}
+          />
         }
       >
         {activeTab === 'overview' && renderOverview()}
@@ -438,29 +583,42 @@ export const StakingScreen: React.FC = () => {
         onRequestClose={() => setShowDelegateModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {isUnstaking ? 'Undelegate from' : 'Delegate to'} {selectedValidator?.name}
-            </Text>
+          <GlassCard style={styles.modalContent} intensity="heavy">
+            <LinearGradient
+              colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+              style={StyleSheet.absoluteFill}
+            />
             
-            <View style={styles.modalInput}>
+            <Text style={styles.modalTitle}>
+              {isUnstaking ? 'Undelegate from' : 'Delegate to'}
+            </Text>
+            <Text style={styles.modalSubtitle}>{selectedValidator?.name}</Text>
+            
+            <View style={styles.modalInputContainer}>
               <Text style={styles.modalInputLabel}>Amount (SHR)</Text>
-              <TextInput
-                style={styles.modalTextInput}
-                placeholder="0.00000000"
-                placeholderTextColor="#666"
-                value={delegateAmount}
-                onChangeText={setDelegateAmount}
-                keyboardType="decimal-pad"
-              />
-              {!isUnstaking && balance && (
-                <TouchableOpacity 
-                  onPress={() => setDelegateAmount(balance.total)}
-                  style={styles.maxButton}
-                >
-                  <Text style={styles.maxButtonText}>MAX</Text>
-                </TouchableOpacity>
-              )}
+              <View style={styles.modalInputWrapper}>
+                <TextInput
+                  style={styles.modalTextInput}
+                  placeholder="0.00000000"
+                  placeholderTextColor={colors.text.muted}
+                  value={delegateAmount}
+                  onChangeText={setDelegateAmount}
+                  keyboardType="decimal-pad"
+                />
+                {!isUnstaking && balance && (
+                  <TouchableOpacity 
+                    onPress={() => setDelegateAmount(balance.total)}
+                    style={styles.maxButton}
+                  >
+                    <LinearGradient
+                      colors={gradients.primary}
+                      style={styles.maxButtonGradient}
+                    >
+                      <Text style={styles.maxButtonText}>MAX</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
 
             {!isUnstaking && (
@@ -470,30 +628,32 @@ export const StakingScreen: React.FC = () => {
             )}
 
             <View style={styles.modalActions}>
-              <TouchableOpacity 
+              <Pressable 
                 style={styles.modalCancelButton}
                 onPress={() => setShowDelegateModal(false)}
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[
-                  styles.modalConfirmButton,
-                  isUnstaking && styles.modalConfirmButtonDanger
-                ]}
+              </Pressable>
+              <Pressable
                 onPress={isUnstaking ? handleUndelegate : handleDelegate}
                 disabled={isLoading}
+                style={styles.modalConfirmWrapper}
               >
-                {isLoading ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.modalConfirmText}>
-                    {isUnstaking ? 'Undelegate' : 'Delegate'}
-                  </Text>
-                )}
-              </TouchableOpacity>
+                <LinearGradient
+                  colors={isUnstaking ? ['#EF4444', '#DC2626'] : gradients.primary}
+                  style={styles.modalConfirmButton}
+                >
+                  {isLoading ? (
+                    <PulsingDot />
+                  ) : (
+                    <Text style={styles.modalConfirmText}>
+                      {isUnstaking ? 'Undelegate' : 'Delegate'}
+                    </Text>
+                  )}
+                </LinearGradient>
+              </Pressable>
             </View>
-          </View>
+          </GlassCard>
         </View>
       </Modal>
     </View>
@@ -503,297 +663,376 @@ export const StakingScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: colors.background.primary,
+  },
+  backgroundOrbs: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+  },
+  orb: {
+    position: 'absolute',
+    borderRadius: 9999,
+  },
+  orb1: {
+    width: 300,
+    height: 300,
+    top: -50,
+    right: -100,
+    backgroundColor: 'rgba(139, 92, 246, 0.08)',
+  },
+  orb2: {
+    width: 200,
+    height: 200,
+    bottom: 100,
+    left: -50,
+    backgroundColor: 'rgba(16, 185, 129, 0.06)',
   },
   errorBanner: {
-    backgroundColor: '#F44336',
-    padding: 12,
+    padding: spacing.md,
     alignItems: 'center',
+    overflow: 'hidden',
   },
   errorText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: typography.caption.fontSize,
+    fontWeight: '600',
   },
   tabBar: {
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    padding: spacing.xs,
+    overflow: 'hidden',
+  },
+  tabsContainer: {
     flexDirection: 'row',
-    backgroundColor: '#1E1E1E',
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    position: 'relative',
   },
   tab: {
     flex: 1,
-    paddingVertical: 16,
+    paddingVertical: spacing.md,
     alignItems: 'center',
+    zIndex: 1,
   },
-  activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#2196F3',
+  tabIcon: {
+    fontSize: 16,
+    marginBottom: 2,
+    opacity: 0.6,
+  },
+  tabIconActive: {
+    opacity: 1,
   },
   tabText: {
-    color: '#888',
-    fontSize: 14,
+    color: colors.text.tertiary,
+    fontSize: 12,
+    fontWeight: '500',
   },
-  activeTabText: {
-    color: '#2196F3',
-    fontWeight: 'bold',
+  tabTextActive: {
+    color: colors.text.primary,
+    fontWeight: '700',
   },
-  content: {
+  tabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    width: 110,
+    height: '100%',
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+  },
+  tabIndicatorGradient: {
+    flex: 1,
+    opacity: 0.2,
+  },
+  scrollView: {
     flex: 1,
   },
-  overviewContainer: {
-    padding: 16,
+  tabContent: {
+    padding: spacing.md,
   },
   statusCard: {
-    backgroundColor: '#1E1E1E',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
   },
-  statusRow: {
-    flexDirection: 'row',
+  statusHeader: {
     alignItems: 'center',
   },
-  statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 8,
-  },
-  statusText: {
-    color: '#fff',
-    fontSize: 16,
-  },
-  statsContainer: {
+  statsGrid: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
+    gap: spacing.md,
+    marginBottom: spacing.md,
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#1E1E1E',
-    padding: 16,
-    borderRadius: 12,
+    padding: spacing.md,
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  statIcon: {
+    fontSize: 24,
+    marginBottom: spacing.xs,
   },
   statLabel: {
-    color: '#888',
-    fontSize: 12,
-    marginBottom: 4,
+    color: colors.text.tertiary,
+    fontSize: typography.small.fontSize,
+    marginBottom: spacing.xs,
   },
   statValue: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    color: colors.text.primary,
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  statCurrency: {
+    color: colors.text.muted,
+    fontSize: typography.small.fontSize,
   },
   claimButton: {
-    backgroundColor: '#4CAF50',
-    padding: 16,
-    borderRadius: 12,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    justifyContent: 'center',
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    marginBottom: spacing.lg,
+    ...shadows.button,
+    shadowColor: colors.success.base,
+  },
+  claimIcon: {
+    fontSize: 20,
+    marginRight: spacing.sm,
   },
   claimButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: typography.bodyBold.fontSize,
+    fontWeight: '700',
   },
-  quickActions: {
-    marginBottom: 24,
+  quickActionCard: {
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  quickActionHeader: {
+    marginBottom: spacing.md,
   },
   sectionTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 12,
+    color: colors.text.primary,
+    fontSize: typography.bodyBold.fontSize,
+    fontWeight: '600',
   },
   quickActionButton: {
-    backgroundColor: '#2196F3',
-    padding: 16,
-    borderRadius: 12,
+    flexDirection: 'row',
     alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: radius.md,
+  },
+  quickActionIcon: {
+    fontSize: 20,
+    marginRight: spacing.md,
   },
   quickActionText: {
+    flex: 1,
     color: '#fff',
-    fontSize: 14,
+    fontSize: typography.body.fontSize,
     fontWeight: '500',
   },
+  quickActionArrow: {
+    color: '#fff',
+    fontSize: 18,
+  },
   delegationsSummary: {
-    backgroundColor: '#1E1E1E',
-    padding: 16,
-    borderRadius: 12,
+    padding: spacing.md,
   },
   delegationItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    borderBottomColor: colors.glass.borderLight,
   },
+  delegationInfo: {},
   delegationValidator: {
-    color: '#fff',
-    fontSize: 14,
+    color: colors.text.primary,
+    fontSize: typography.body.fontSize,
   },
   delegationAmount: {
-    color: '#4CAF50',
-    fontSize: 14,
-    fontWeight: '500',
+    color: colors.success.base,
+    fontSize: typography.body.fontSize,
+    fontWeight: '600',
   },
   seeMoreText: {
-    color: '#2196F3',
-    fontSize: 14,
-    marginTop: 8,
+    color: colors.primary.start,
+    fontSize: typography.caption.fontSize,
+    marginTop: spacing.sm,
     textAlign: 'center',
   },
-  validatorsContainer: {
-    padding: 16,
-  },
   validatorCard: {
-    backgroundColor: '#1E1E1E',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    overflow: 'hidden',
   },
   validatorHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   validatorInfo: {
     flex: 1,
   },
+  validatorNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  validatorIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.glass.light,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
+  },
   validatorName: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: colors.text.primary,
+    fontSize: typography.bodyBold.fontSize,
+    fontWeight: '600',
   },
   validatorAddress: {
-    color: '#666',
-    fontSize: 12,
+    color: colors.text.muted,
+    fontSize: typography.small.fontSize,
     marginTop: 2,
   },
   validatorStatus: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
   },
   validatorStatusText: {
     color: '#fff',
     fontSize: 10,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   validatorStats: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   validatorStat: {
     width: '50%',
-    paddingVertical: 4,
+    paddingVertical: spacing.xs,
   },
   validatorStatLabel: {
-    color: '#888',
-    fontSize: 12,
+    color: colors.text.tertiary,
+    fontSize: typography.small.fontSize,
   },
   validatorStatValue: {
-    color: '#fff',
-    fontSize: 14,
+    color: colors.text.primary,
+    fontSize: typography.body.fontSize,
+    fontWeight: '500',
   },
   delegateButton: {
-    backgroundColor: '#2196F3',
-    padding: 12,
-    borderRadius: 8,
+    padding: spacing.md,
+    borderRadius: radius.md,
     alignItems: 'center',
   },
   delegateButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
-  },
-  delegationsContainer: {
-    padding: 16,
+    fontWeight: '700',
   },
   delegationCard: {
-    backgroundColor: '#1E1E1E',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    overflow: 'hidden',
   },
-  delegationHeader: {
+  delegationCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    alignItems: 'flex-start',
+    marginBottom: spacing.md,
   },
   delegationValidatorName: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: colors.text.primary,
+    fontSize: typography.bodyBold.fontSize,
+    fontWeight: '600',
   },
-  delegationRewards: {
-    color: '#4CAF50',
-    fontSize: 14,
-    fontWeight: '500',
+  delegationStarted: {
+    color: colors.text.muted,
+    fontSize: typography.small.fontSize,
+    marginTop: 2,
+  },
+  delegationRewardsBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.success.base,
+  },
+  delegationRewardsText: {
+    color: colors.success.base,
+    fontSize: typography.small.fontSize,
+    fontWeight: '600',
   },
   delegationDetails: {
-    flexDirection: 'row',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
-  delegationDetail: {
-    flex: 1,
+  delegationDetailItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   delegationDetailLabel: {
-    color: '#888',
-    fontSize: 12,
+    color: colors.text.tertiary,
+    fontSize: typography.caption.fontSize,
   },
   delegationDetailValue: {
-    color: '#fff',
-    fontSize: 14,
+    color: colors.text.primary,
+    fontSize: typography.body.fontSize,
+    fontWeight: '500',
   },
   delegationActions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: spacing.sm,
+  },
+  delegationActionWrapper: {
+    flex: 1,
   },
   delegationAction: {
-    flex: 1,
-    padding: 10,
-    borderRadius: 8,
+    padding: spacing.sm,
+    borderRadius: radius.md,
     alignItems: 'center',
-  },
-  delegationActionAdd: {
-    backgroundColor: '#2196F3',
-  },
-  delegationActionRemove: {
-    backgroundColor: '#F44336',
   },
   delegationActionText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: typography.caption.fontSize,
+    fontWeight: '600',
   },
   emptyState: {
+    padding: spacing.xxl,
     alignItems: 'center',
-    paddingVertical: 48,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: spacing.md,
   },
   emptyText: {
-    color: '#fff',
-    fontSize: 18,
+    color: colors.text.primary,
+    fontSize: typography.h3.fontSize,
+    fontWeight: '600',
+    marginBottom: spacing.xs,
   },
   emptySubtext: {
-    color: '#666',
-    fontSize: 14,
-    marginTop: 8,
+    color: colors.text.tertiary,
+    fontSize: typography.body.fontSize,
     textAlign: 'center',
+    marginBottom: spacing.lg,
   },
   startStakingButton: {
-    backgroundColor: '#2196F3',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginTop: 16,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
   },
   startStakingText: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   modalOverlay: {
     flex: 1,
@@ -801,81 +1040,94 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#1E1E1E',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 24,
+    borderTopLeftRadius: radius.xxl,
+    borderTopRightRadius: radius.xxl,
+    padding: spacing.lg,
+    overflow: 'hidden',
   },
   modalTitle: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 24,
+    color: colors.text.secondary,
+    fontSize: typography.caption.fontSize,
     textAlign: 'center',
+    marginBottom: spacing.xs,
   },
-  modalInput: {
-    marginBottom: 8,
+  modalSubtitle: {
+    color: colors.text.primary,
+    fontSize: typography.h2.fontSize,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  modalInputContainer: {
+    marginBottom: spacing.sm,
   },
   modalInputLabel: {
-    color: '#888',
-    fontSize: 14,
-    marginBottom: 8,
+    color: colors.text.secondary,
+    fontSize: typography.caption.fontSize,
+    marginBottom: spacing.xs,
+  },
+  modalInputWrapper: {
+    position: 'relative',
   },
   modalTextInput: {
-    backgroundColor: '#2A2A2A',
-    borderRadius: 12,
-    padding: 16,
-    color: '#fff',
-    fontSize: 18,
+    backgroundColor: colors.glass.light,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    color: colors.text.primary,
+    fontSize: 20,
+    fontWeight: '600',
   },
   maxButton: {
     position: 'absolute',
-    right: 12,
-    top: 38,
-    backgroundColor: '#2196F3',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 4,
+    right: spacing.sm,
+    top: '50%',
+    marginTop: -14,
+    overflow: 'hidden',
+    borderRadius: radius.sm,
+  },
+  maxButtonGradient: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
   },
   maxButtonText: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   modalHint: {
-    color: '#666',
-    fontSize: 12,
-    marginBottom: 24,
+    color: colors.text.muted,
+    fontSize: typography.small.fontSize,
+    marginBottom: spacing.lg,
   },
   modalActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: spacing.md,
   },
   modalCancelButton: {
     flex: 1,
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: '#333',
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.glass.light,
     alignItems: 'center',
   },
   modalCancelText: {
-    color: '#fff',
-    fontSize: 16,
+    color: colors.text.secondary,
+    fontSize: typography.body.fontSize,
+    fontWeight: '600',
+  },
+  modalConfirmWrapper: {
+    flex: 1,
+    overflow: 'hidden',
+    borderRadius: radius.lg,
   },
   modalConfirmButton: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: '#2196F3',
+    padding: spacing.md,
     alignItems: 'center',
-  },
-  modalConfirmButtonDanger: {
-    backgroundColor: '#F44336',
   },
   modalConfirmText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: typography.body.fontSize,
+    fontWeight: '700',
   },
 });
 

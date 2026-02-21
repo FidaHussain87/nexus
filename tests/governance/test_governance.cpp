@@ -5,9 +5,11 @@
 #include <gtest/gtest.h>
 #include <shurium/governance/governance.h>
 #include <shurium/crypto/keys.h>
+#include <shurium/crypto/sha256.h>
 
 #include <memory>
 #include <vector>
+#include <map>
 
 using namespace shurium;
 using namespace shurium::governance;
@@ -34,16 +36,49 @@ protected:
     
     void SetupVoters() {
         for (int i = 0; i < 10; ++i) {
-            VoterId voter = CreateTestVoterId(i);
+            // Generate deterministic private key for voter
+            std::vector<Byte> privKeyData(32, static_cast<Byte>(0));
+            privKeyData[0] = static_cast<Byte>(i + 100);
+            privKeyData[31] = static_cast<Byte>(i + 200);
+            
+            PrivateKey privKey(privKeyData.data(), 32);
+            PublicKey pubKey = privKey.GetPublicKey();
+            VoterId voter = pubKey.GetID();
+            
+            // Store keys for later use
+            voterPrivateKeys_[i] = privKeyData;
+            voterPublicKeys_[i] = pubKey;
+            
+            // Register voter's public key and voting power
+            engine_->RegisterVoterKey(pubKey);
             engine_->UpdateVotingPower(voter, 1000 + i * 100);
         }
     }
     
     VoterId CreateTestVoterId(uint8_t id) {
-        std::array<Byte, 20> data{};
-        data[0] = id;
-        data[19] = id;
-        return VoterId(data);
+        // Return a real VoterId derived from a deterministic key
+        if (id < 10 && voterPublicKeys_.count(id)) {
+            return voterPublicKeys_[id].GetID();
+        }
+        // Generate on the fly for new ids
+        std::vector<Byte> privKeyData(32, static_cast<Byte>(0));
+        privKeyData[0] = static_cast<Byte>(id + 100);
+        privKeyData[31] = static_cast<Byte>(id + 200);
+        
+        PrivateKey privKey(privKeyData.data(), 32);
+        return privKey.GetPublicKey().GetID();
+    }
+    
+    PrivateKey GetVoterPrivateKey(uint8_t id) {
+        auto it = voterPrivateKeys_.find(id);
+        if (it != voterPrivateKeys_.end()) {
+            return PrivateKey(it->second.data(), 32);
+        }
+        // Generate on the fly
+        std::vector<Byte> privKeyData(32, static_cast<Byte>(0));
+        privKeyData[0] = static_cast<Byte>(id + 100);
+        privKeyData[31] = static_cast<Byte>(id + 200);
+        return PrivateKey(privKeyData.data(), 32);
     }
     
     GovernanceProposalId CreateTestProposalId(uint8_t id) {
@@ -99,7 +134,8 @@ protected:
     Vote CreateTestVote(const GovernanceProposalId& proposalId, 
                         const VoterId& voter, 
                         VoteChoice choice,
-                        uint64_t power) {
+                        uint64_t power,
+                        uint8_t voterId = 1) {
         Vote vote;
         vote.proposalId = proposalId;
         vote.voter = voter;
@@ -107,14 +143,18 @@ protected:
         vote.votingPower = power;
         vote.voteHeight = engine_->GetCurrentHeight();
         vote.reason = "Test vote";
-        // Add dummy signature for test
-        vote.signature.resize(64, 0x01);
+        // Sign the vote properly
+        Hash256 voteHash = vote.GetHash();
+        PrivateKey voterPrivKey = GetVoterPrivateKey(voterId);
+        vote.signature = voterPrivKey.Sign(voteHash);
         return vote;
     }
     
     std::unique_ptr<GovernanceEngine> engine_;
     std::vector<Byte> testPrivateKey_;
     PublicKey testPublicKey_;
+    std::map<uint8_t, std::vector<Byte>> voterPrivateKeys_;
+    std::map<uint8_t, PublicKey> voterPublicKeys_;
 };
 
 // ============================================================================
@@ -1032,7 +1072,7 @@ TEST_F(GovernanceTest, GovernanceEngineCastVote) {
     
     // Cast vote
     VoterId voter = CreateTestVoterId(1);
-    Vote vote = CreateTestVote(*proposalId, voter, VoteChoice::Yes, 1000);
+    Vote vote = CreateTestVote(*proposalId, voter, VoteChoice::Yes, 1000, 1);
     vote.voteHeight = engine_->GetCurrentHeight();
     
     EXPECT_TRUE(engine_->CastVote(vote));
@@ -1054,7 +1094,7 @@ TEST_F(GovernanceTest, GovernanceEngineCastVoteDuplicate) {
     engine_->ProcessBlock(2);
     
     VoterId voter = CreateTestVoterId(1);
-    Vote vote = CreateTestVote(*proposalId, voter, VoteChoice::Yes, 1000);
+    Vote vote = CreateTestVote(*proposalId, voter, VoteChoice::Yes, 1000, 1);
     vote.voteHeight = engine_->GetCurrentHeight();
     
     EXPECT_TRUE(engine_->CastVote(vote));
@@ -1076,7 +1116,7 @@ TEST_F(GovernanceTest, GovernanceEngineGetVotes) {
     // Cast multiple votes
     for (int i = 0; i < 5; ++i) {
         VoterId voter = CreateTestVoterId(i);
-        Vote vote = CreateTestVote(*proposalId, voter, VoteChoice::Yes, 1000 + i * 100);
+        Vote vote = CreateTestVote(*proposalId, voter, VoteChoice::Yes, 1000 + i * 100, static_cast<uint8_t>(i));
         vote.voteHeight = engine_->GetCurrentHeight();
         engine_->CastVote(vote);
     }
@@ -1105,7 +1145,11 @@ TEST_F(GovernanceTest, GovernanceEngineDelegate) {
     delegation.creationHeight = 0;
     delegation.isActive = true;
     
-    std::vector<Byte> sig(64, 0x01);
+    // Sign the delegation properly
+    Hash256 delegationHash = delegation.GetHash();
+    PrivateKey delegatorPrivKey = GetVoterPrivateKey(1);
+    std::vector<Byte> sig = delegatorPrivKey.Sign(delegationHash);
+    
     EXPECT_TRUE(engine_->Delegate(delegation, sig));
     
     auto retrieved = engine_->GetDelegations().GetDelegation(delegator);
@@ -1121,10 +1165,22 @@ TEST_F(GovernanceTest, GovernanceEngineRevokeDelegation) {
     delegation.delegate = delegate;
     delegation.isActive = true;
     
-    std::vector<Byte> sig(64, 0x01);
+    // Sign the delegation properly
+    Hash256 delegationHash = delegation.GetHash();
+    PrivateKey delegatorPrivKey = GetVoterPrivateKey(1);
+    std::vector<Byte> sig = delegatorPrivKey.Sign(delegationHash);
     engine_->Delegate(delegation, sig);
     
-    EXPECT_TRUE(engine_->RevokeDelegation(delegator, sig));
+    // Sign the revocation - must include "revoke" suffix as per implementation
+    SHA256 sha2;
+    sha2.Write(delegator.data(), delegator.size());
+    const char* revokeStr = "revoke";
+    sha2.Write(reinterpret_cast<const Byte*>(revokeStr), 6);
+    Hash256 revocationHash;
+    sha2.Finalize(revocationHash.data());
+    std::vector<Byte> revokeSig = delegatorPrivKey.Sign(revocationHash);
+    
+    EXPECT_TRUE(engine_->RevokeDelegation(delegator, revokeSig));
     
     auto retrieved = engine_->GetDelegations().GetDelegation(delegator);
     EXPECT_FALSE(retrieved.has_value());
@@ -1175,9 +1231,13 @@ TEST_F(GovernanceTest, GovernanceEngineVotingEndsAndRejects) {
     EXPECT_EQ(finalProposal->status, GovernanceStatus::QuorumFailed);
 }
 
-TEST_F(GovernanceTest, GovernanceEngineSerializationStub) {
+TEST_F(GovernanceTest, GovernanceEngineSerialization) {
     auto serialized = engine_->Serialize();
-    // Stub returns empty vector
-    EXPECT_TRUE(serialized.empty());
+    // Serialization is now implemented - should return non-empty data
+    EXPECT_FALSE(serialized.empty());
+    
+    // Verify we can deserialize back
+    GovernanceEngine engine2;
+    EXPECT_TRUE(engine2.Deserialize(serialized.data(), serialized.size()));
 }
 

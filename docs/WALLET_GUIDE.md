@@ -114,7 +114,7 @@ Your wallet has THREE different but related components:
 │                                                                     │
 │  What: Secret number      What: Public point      What: Identifier  │
 │  Size: 32 bytes           Size: 33 bytes          Size: 42 chars    │
-│  Format: L4rK1yD...       Format: 02a1b2c3...     Format: nx1q...   │
+│  Format: L4rK1yD...       Format: 02a1b2c3...     Format: shr1q...  │
 │                                                                     │
 │  ┌─────────────┐          ┌─────────────┐         ┌─────────────┐   │
 │  │             │          │             │         │             │   │
@@ -142,7 +142,7 @@ Your wallet has THREE different but related components:
 |----------|-------------|------------|---------|
 | **What is it?** | Secret 256-bit number | Point on elliptic curve | Hash of public key |
 | **Size** | 32 bytes (64 hex chars) | 33 bytes (compressed) | ~42 characters |
-| **Example** | `L4rK1yDtCWekvXuE54...` | `02a1b2c3d4e5f6...` | `nx1qkjh8y4w7...` |
+| **Example** | `L4rK1yDtCWekvXuE54...` | `02a1b2c3d4e5f6...` | `shr1qkjh8y4w7...` |
 | **Can share?** | NEVER! | Yes (rarely needed) | Yes (for receiving) |
 | **Purpose** | Control funds | Verify ownership | Receive payments |
 | **If lost?** | Funds gone forever | Can regenerate | Can regenerate |
@@ -185,7 +185,7 @@ Your wallet has THREE different but related components:
 │           │ RIPEMD160(SHA256())         │ RIPEMD160(SHA256())       │
 │           ▼                             ▼                           │
 │  STEP 8a: Address 1            STEP 8b: Address 2                   │
-│           nx1qkjh8y4w7...              nx1qa5gjxzlm...              │
+│           shr1qkjh8y4w7...              shr1qa5gjxzlm...             │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -223,10 +223,10 @@ Your wallet has THREE different but related components:
 │   RIPEMD160:      89abcdef012345678901234567890123456789ab          │
 │                              │                                      │
 │                              ▼                                      │
-│   Add prefix:     nx (mainnet) or tshr (testnet)                    │
+│   Add prefix:     shr (mainnet) or tshr (testnet)                   │
 │                              │                                      │
 │                              ▼                                      │
-│   Bech32 encode:  nx1qkjh8y4w7dqav3mhswd6uftuupsyg4a4d7fzfcq        │
+│   Bech32 encode:  shr1qkjh8y4w7dqav3mhswd6uftuupsyg4a4d7fzfcq       │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -242,7 +242,7 @@ Every time you create a new address, a new key pair is generated:
 # Generate new address (creates new private/public key pair internally)
 ./shurium-cli getnewaddress "my savings"
 
-# Output: nx1qnewaddress...
+# Output: shr1qnewaddress...
 ```
 
 **For Testnet:**
@@ -262,7 +262,7 @@ You can export a private key, but be extremely careful:
 ./shurium-cli walletpassphrase "your_password" 60
 
 # Step 2: Export private key for an address
-./shurium-cli dumpprivkey "nx1qyouraddress..."
+./shurium-cli dumpprivkey "shr1qyouraddress..."
 
 # Output: L4rK1yDtCWekvXuE54FRgbQCGVn5HsWJgEwBMdXDMJpA3s4kZm
 # WARNING: Anyone with this string can steal funds from this address!

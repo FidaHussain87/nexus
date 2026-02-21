@@ -121,7 +121,7 @@ int main(int argc, char* argv[]) {
     Amount initialReward = mainParams.nInitialBlockReward;
     
     std::cout << "Initial block reward: " << initialReward << " satoshis" << std::endl;
-    std::cout << "                    = " << (initialReward / COIN) << " NXS" << std::endl;
+    std::cout << "                    = " << (initialReward / COIN) << " SHR" << std::endl;
     
     // Parse command line arguments
     std::string network = "all";

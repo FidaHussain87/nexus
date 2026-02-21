@@ -120,12 +120,16 @@ bool CheckTransaction(const Transaction& tx, ValidationState& state);
 /// @return True if all inputs are available
 // bool CheckTxInputsAvailable(const Transaction& tx, ValidationState& state);
 
+/// Maximum allowed future block time drift from network-adjusted time (2 hours)
+constexpr int64_t MAX_FUTURE_BLOCK_TIME = 2 * 60 * 60;
+
 /// Check if block timestamp is valid in context
 /// @param block Block to check
 /// @param nPrevBlockTime Previous block timestamp
+/// @param nAdjustedTime Current network-adjusted time (pass 0 to skip future check)
 /// @param state Validation state (output)
 /// @return True if timestamp is valid
-bool CheckBlockTime(const Block& block, int64_t nPrevBlockTime, ValidationState& state);
+bool CheckBlockTime(const Block& block, int64_t nPrevBlockTime, int64_t nAdjustedTime, ValidationState& state);
 
 // ============================================================================
 // Size and Resource Limits

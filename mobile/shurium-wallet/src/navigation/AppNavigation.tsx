@@ -1,13 +1,26 @@
 /**
- * SHURIUM Mobile Wallet - Main Navigation
- * App navigation configuration with all screens
+ * SHURIUM Mobile Wallet - Premium Navigation
+ * Glassmorphism tab bar with smooth animations
  */
 
-import React from 'react';
-import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import React, { useRef, useEffect } from 'react';
+import { 
+  NavigationContainer, 
+  DefaultTheme,
+  useNavigationState,
+} from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  Animated, 
+  Pressable,
+  Platform,
+} from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import { BlurView } from '@react-native-community/blur';
 
 // Import all screens
 import { HomeScreen } from '../screens/HomeScreen';
@@ -18,20 +31,47 @@ import { UBIScreen } from '../screens/UBIScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { TransactionsScreen } from '../screens/TransactionsScreen';
 import { FaucetScreen } from '../screens/FaucetScreen';
+import { colors, gradients, spacing, radius, shadows, typography } from '../theme';
+import { GlassCard } from '../components/ui';
 
-// Transaction Detail Screen (inline for simplicity)
+// Transaction Detail Screen
 const TransactionDetailScreen: React.FC<{ route: any }> = ({ route }) => {
   const { txid } = route.params || {};
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
   return (
     <View style={styles.detailContainer}>
-      <Text style={styles.detailTitle}>Transaction Details</Text>
-      <View style={styles.detailCard}>
-        <Text style={styles.detailLabel}>Transaction ID</Text>
-        <Text style={styles.detailValue} selectable>{txid || 'Unknown'}</Text>
+      <View style={styles.backgroundOrbs}>
+        <Animated.View style={[styles.orb, styles.orb1, { opacity: fadeAnim }]} />
       </View>
-      <Text style={styles.detailHint}>
-        Full transaction details will be fetched from the blockchain
-      </Text>
+      
+      <Animated.View style={{ opacity: fadeAnim }}>
+        <Text style={styles.detailTitle}>Transaction Details</Text>
+        
+        <GlassCard style={styles.detailCard} intensity="light">
+          <Text style={styles.detailLabel}>Transaction ID</Text>
+          <Text style={styles.detailValue} selectable>{txid || 'Unknown'}</Text>
+        </GlassCard>
+        
+        <GlassCard style={styles.detailHintCard} intensity="light">
+          <LinearGradient
+            colors={['rgba(139, 92, 246, 0.1)', 'rgba(59, 130, 246, 0.05)']}
+            style={StyleSheet.absoluteFill}
+          />
+          <Text style={styles.detailHintIcon}>ℹ️</Text>
+          <Text style={styles.detailHint}>
+            Full transaction details will be fetched from the blockchain
+          </Text>
+        </GlassCard>
+      </Animated.View>
     </View>
   );
 };
@@ -60,64 +100,163 @@ export type MainTabsParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabsParamList>();
 
-// Dark theme
-const DarkTheme = {
+// Premium Dark Theme
+const PremiumDarkTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
-    primary: '#2196F3',
-    background: '#121212',
-    card: '#1E1E1E',
-    text: '#FFFFFF',
-    border: '#333333',
-    notification: '#F44336',
+    primary: colors.primary.start,
+    background: colors.background.primary,
+    card: colors.background.secondary,
+    text: colors.text.primary,
+    border: colors.glass.borderLight,
+    notification: colors.error.base,
   },
 };
 
-// Tab bar icon component
-const TabIcon: React.FC<{ name: string; focused: boolean }> = ({ name, focused }) => {
-  const getIcon = () => {
-    switch (name) {
-      case 'Home': return '⌂';
-      case 'Wallet': return '◈';
-      case 'Stake': return '◎';
-      case 'Settings': return '⚙';
-      default: return '?';
-    }
-  };
+// Tab configuration
+const TAB_CONFIG = [
+  { name: 'Home' as const, icon: '🏠', label: 'Home', gradient: gradients.primary },
+  { name: 'Wallet' as const, icon: '📋', label: 'Wallet', gradient: ['#10B981', '#059669'] },
+  { name: 'Stake' as const, icon: '💎', label: 'Stake', gradient: ['#3B82F6', '#2563EB'] },
+  { name: 'Settings' as const, icon: '⚙️', label: 'Settings', gradient: ['#6B7280', '#4B5563'] },
+];
+
+// Custom Tab Bar Component
+interface CustomTabBarProps {
+  state: any;
+  descriptors: any;
+  navigation: any;
+}
+
+const CustomTabBar: React.FC<CustomTabBarProps> = ({ state, descriptors, navigation }) => {
+  const animValues = useRef(TAB_CONFIG.map(() => new Animated.Value(0))).current;
+
+  useEffect(() => {
+    TAB_CONFIG.forEach((_, index) => {
+      Animated.spring(animValues[index], {
+        toValue: state.index === index ? 1 : 0,
+        damping: 15,
+        stiffness: 200,
+        useNativeDriver: true,
+      }).start();
+    });
+  }, [state.index]);
 
   return (
-    <View style={[styles.tabIcon, focused && styles.tabIconFocused]}>
-      <Text style={[styles.tabIconText, focused && styles.tabIconTextFocused]}>
-        {getIcon()}
-      </Text>
+    <View style={styles.tabBarContainer}>
+      {/* Glass background */}
+      <View style={styles.tabBarGlass}>
+        <LinearGradient
+          colors={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.04)']}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+        />
+        <View style={styles.tabBarInner}>
+          {state.routes.map((route: any, index: number) => {
+            const { options } = descriptors[route.key];
+            const tabConfig = TAB_CONFIG[index];
+            const isFocused = state.index === index;
+
+            const onPress = () => {
+              const event = navigation.emit({
+                type: 'tabPress',
+                target: route.key,
+                canPreventDefault: true,
+              });
+
+              if (!isFocused && !event.defaultPrevented) {
+                navigation.navigate(route.name);
+              }
+            };
+
+            const scaleAnim = animValues[index].interpolate({
+              inputRange: [0, 1],
+              outputRange: [1, 1.1],
+            });
+
+            return (
+              <Pressable
+                key={route.key}
+                onPress={onPress}
+                style={styles.tabButton}
+              >
+                <Animated.View
+                  style={[
+                    styles.tabIconWrapper,
+                    {
+                      transform: [{ scale: scaleAnim }],
+                    },
+                  ]}
+                >
+                  {isFocused ? (
+                    <LinearGradient
+                      colors={tabConfig.gradient}
+                      style={styles.tabIconGradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                    >
+                      <Text style={styles.tabIconText}>{tabConfig.icon}</Text>
+                    </LinearGradient>
+                  ) : (
+                    <View style={styles.tabIconInactive}>
+                      <Text style={styles.tabIconText}>{tabConfig.icon}</Text>
+                    </View>
+                  )}
+                </Animated.View>
+                <Text style={[
+                  styles.tabLabel,
+                  isFocused && { color: tabConfig.gradient[0] }
+                ]}>
+                  {tabConfig.label}
+                </Text>
+                {isFocused && (
+                  <Animated.View 
+                    style={[
+                      styles.tabDot,
+                      { 
+                        backgroundColor: tabConfig.gradient[0],
+                        opacity: animValues[index],
+                      }
+                    ]} 
+                  />
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
     </View>
   );
 };
+
+// Header component with glass effect
+const GlassHeader: React.FC<{ title: string }> = ({ title }) => (
+  <View style={styles.headerContainer}>
+    <LinearGradient
+      colors={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.02)']}
+      style={StyleSheet.absoluteFill}
+    />
+    <Text style={styles.headerTitle}>{title}</Text>
+  </View>
+);
 
 // Main tab navigator
 const MainTabs: React.FC = () => {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused }) => <TabIcon name={route.name} focused={focused} />,
-        tabBarActiveTintColor: '#2196F3',
-        tabBarInactiveTintColor: '#666',
-        tabBarStyle: {
-          backgroundColor: '#1E1E1E',
-          borderTopColor: '#333',
-          paddingBottom: 8,
-          paddingTop: 8,
-          height: 60,
-        },
+      tabBar={(props) => <CustomTabBar {...props} />}
+      screenOptions={{
         headerStyle: {
-          backgroundColor: '#1E1E1E',
+          backgroundColor: colors.background.secondary,
         },
-        headerTintColor: '#fff',
+        headerTintColor: colors.text.primary,
         headerTitleStyle: {
-          fontWeight: 'bold',
+          fontWeight: '700',
         },
-      })}
+        headerShadowVisible: false,
+      }}
     >
       <Tab.Screen
         name="Home"
@@ -125,6 +264,12 @@ const MainTabs: React.FC = () => {
         options={{
           title: 'SHURIUM',
           headerTitleAlign: 'center',
+          headerBackground: () => (
+            <LinearGradient
+              colors={[colors.background.secondary, colors.background.primary]}
+              style={StyleSheet.absoluteFill}
+            />
+          ),
         }}
       />
       <Tab.Screen
@@ -132,6 +277,12 @@ const MainTabs: React.FC = () => {
         component={TransactionsScreen}
         options={{
           title: 'Transactions',
+          headerBackground: () => (
+            <LinearGradient
+              colors={[colors.background.secondary, colors.background.primary]}
+              style={StyleSheet.absoluteFill}
+            />
+          ),
         }}
       />
       <Tab.Screen
@@ -139,6 +290,12 @@ const MainTabs: React.FC = () => {
         component={StakingScreen}
         options={{
           title: 'Staking',
+          headerBackground: () => (
+            <LinearGradient
+              colors={[colors.background.secondary, colors.background.primary]}
+              style={StyleSheet.absoluteFill}
+            />
+          ),
         }}
       />
       <Tab.Screen
@@ -146,28 +303,43 @@ const MainTabs: React.FC = () => {
         component={SettingsScreen}
         options={{
           title: 'Settings',
+          headerBackground: () => (
+            <LinearGradient
+              colors={[colors.background.secondary, colors.background.primary]}
+              style={StyleSheet.absoluteFill}
+            />
+          ),
         }}
       />
     </Tab.Navigator>
   );
 };
 
+// Stack screen options with glass header
+const screenOptions = {
+  headerStyle: {
+    backgroundColor: colors.background.secondary,
+  },
+  headerTintColor: colors.text.primary,
+  headerTitleStyle: {
+    fontWeight: '700' as const,
+    fontSize: 17,
+  },
+  headerShadowVisible: false,
+  headerBackTitleVisible: false,
+  headerBackground: () => (
+    <LinearGradient
+      colors={[colors.background.secondary, colors.background.primary]}
+      style={StyleSheet.absoluteFill}
+    />
+  ),
+};
+
 // Main navigation
 export const AppNavigation: React.FC = () => {
   return (
-    <NavigationContainer theme={DarkTheme}>
-      <Stack.Navigator
-        screenOptions={{
-          headerStyle: {
-            backgroundColor: '#1E1E1E',
-          },
-          headerTintColor: '#fff',
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
-          headerBackTitleVisible: false,
-        }}
-      >
+    <NavigationContainer theme={PremiumDarkTheme}>
+      <Stack.Navigator screenOptions={screenOptions}>
         <Stack.Screen
           name="MainTabs"
           component={MainTabs}
@@ -176,12 +348,18 @@ export const AppNavigation: React.FC = () => {
         <Stack.Screen
           name="Send"
           component={SendScreen}
-          options={{ title: 'Send SHR' }}
+          options={{ 
+            title: 'Send SHR',
+            headerTintColor: '#EF4444',
+          }}
         />
         <Stack.Screen
           name="Receive"
           component={ReceiveScreen}
-          options={{ title: 'Receive SHR' }}
+          options={{ 
+            title: 'Receive SHR',
+            headerTintColor: '#10B981',
+          }}
         />
         <Stack.Screen
           name="Staking"
@@ -191,12 +369,15 @@ export const AppNavigation: React.FC = () => {
         <Stack.Screen
           name="UBI"
           component={UBIScreen}
-          options={{ title: 'Universal Basic Income' }}
+          options={{ 
+            title: 'Universal Basic Income',
+            headerTintColor: '#A855F7',
+          }}
         />
         <Stack.Screen
           name="Transactions"
           component={TransactionsScreen}
-          options={{ title: 'Transaction History' }}
+          options={{ title: 'History' }}
         />
         <Stack.Screen
           name="TransactionDetail"
@@ -206,7 +387,10 @@ export const AppNavigation: React.FC = () => {
         <Stack.Screen
           name="Faucet"
           component={FaucetScreen}
-          options={{ title: 'Test Faucet' }}
+          options={{ 
+            title: 'Test Faucet',
+            headerTintColor: '#06B6D4',
+          }}
         />
         <Stack.Screen
           name="Settings"
@@ -219,56 +403,139 @@ export const AppNavigation: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  tabIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  // Tab Bar
+  tabBarContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xs,
+  },
+  tabBarGlass: {
+    borderRadius: radius.xl,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.glass.border,
+    backgroundColor: 'rgba(18, 18, 26, 0.85)',
+    ...shadows.card,
+  },
+  tabBarInner: {
+    flexDirection: 'row',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+  },
+  tabButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+  },
+  tabIconWrapper: {
+    marginBottom: spacing.xs,
+  },
+  tabIconGradient: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'transparent',
+    ...shadows.button,
   },
-  tabIconFocused: {
-    backgroundColor: 'rgba(33, 150, 243, 0.2)',
+  tabIconInactive: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.glass.light,
   },
   tabIconText: {
-    color: '#666',
-    fontSize: 18,
+    fontSize: 20,
   },
-  tabIconTextFocused: {
-    color: '#2196F3',
+  tabLabel: {
+    color: colors.text.muted,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
   },
+  tabDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    marginTop: 4,
+  },
+
+  // Header
+  headerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    color: colors.text.primary,
+    fontSize: 17,
+    fontWeight: '700',
+  },
+
+  // Transaction Detail
   detailContainer: {
     flex: 1,
-    backgroundColor: '#121212',
-    padding: 16,
+    backgroundColor: colors.background.primary,
+    padding: spacing.md,
+  },
+  backgroundOrbs: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+  },
+  orb: {
+    position: 'absolute',
+    borderRadius: 9999,
+  },
+  orb1: {
+    width: 200,
+    height: 200,
+    top: -50,
+    right: -50,
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
   },
   detailTitle: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 24,
+    color: colors.text.primary,
+    fontSize: typography.h2.fontSize,
+    fontWeight: '700',
+    marginBottom: spacing.lg,
     textAlign: 'center',
   },
   detailCard: {
-    backgroundColor: '#1E1E1E',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
+    padding: spacing.md,
+    marginBottom: spacing.md,
   },
   detailLabel: {
-    color: '#888',
-    fontSize: 12,
-    marginBottom: 4,
+    color: colors.text.muted,
+    fontSize: typography.small.fontSize,
+    marginBottom: spacing.xs,
   },
   detailValue: {
-    color: '#fff',
-    fontSize: 14,
+    color: colors.text.primary,
+    fontSize: typography.body.fontSize,
     fontFamily: 'monospace',
   },
+  detailHintCard: {
+    padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  detailHintIcon: {
+    fontSize: 16,
+    marginRight: spacing.sm,
+  },
   detailHint: {
-    color: '#666',
-    fontSize: 14,
-    textAlign: 'center',
+    flex: 1,
+    color: colors.text.tertiary,
+    fontSize: typography.caption.fontSize,
+    lineHeight: 18,
   },
 });
 

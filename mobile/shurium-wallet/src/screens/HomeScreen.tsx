@@ -1,9 +1,9 @@
 /**
  * SHURIUM Mobile Wallet - Home Screen
- * Main wallet dashboard showing balance, quick actions, and recent transactions
+ * Premium glassmorphism design with animations
  */
 
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,15 +11,25 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
-  ActivityIndicator,
+  Animated,
+  Dimensions,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useWalletStore } from '../store/wallet';
-import { formatSHR } from '../utils/crypto';
+import { 
+  GlassCard, 
+  GradientButton, 
+  AnimatedBalance,
+  StatusPill,
+  GlowingIcon,
+} from '../components/ui';
+import { colors, gradients, spacing, radius, shadows } from '../theme';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { Transaction } from '../types';
 
 type NavigationProp = NativeStackNavigationProp<any>;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
@@ -39,11 +49,46 @@ export const HomeScreen: React.FC = () => {
   } = useWalletStore();
 
   const [refreshing, setRefreshing] = React.useState(false);
-
   const activeAccount = accounts.find(a => a.id === activeAccountId);
+
+  // Animations
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     checkConnection();
+    
+    // Entrance animations
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        damping: 15,
+        stiffness: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Continuous glow animation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
   }, []);
 
   const onRefresh = useCallback(async () => {
@@ -54,9 +99,9 @@ export const HomeScreen: React.FC = () => {
 
   const getNetworkColor = () => {
     switch (network) {
-      case 'mainnet': return '#4CAF50';
-      case 'testnet': return '#FF9800';
-      case 'regtest': return '#9C27B0';
+      case 'mainnet': return colors.success.base;
+      case 'testnet': return colors.warning.base;
+      case 'regtest': return colors.accent.purple;
     }
   };
 
@@ -65,380 +110,612 @@ export const HomeScreen: React.FC = () => {
     return num.toFixed(8);
   };
 
-  const getTransactionIcon = (type: string) => {
+  const getTransactionColor = (type: string) => {
     switch (type) {
-      case 'send': return '-';
-      case 'receive': return '+';
-      case 'stake': return 'S';
-      case 'unstake': return 'U';
-      case 'ubi_claim': return 'UBI';
-      default: return '?';
+      case 'send': return colors.error.base;
+      case 'receive': return colors.success.base;
+      case 'stake': return colors.accent.blue;
+      case 'unstake': return colors.warning.base;
+      case 'ubi_claim': return colors.accent.purple;
+      default: return colors.text.muted;
     }
   };
 
-  const getTransactionColor = (type: string) => {
-    switch (type) {
-      case 'send': return '#F44336';
-      case 'receive': return '#4CAF50';
-      case 'stake': return '#2196F3';
-      case 'unstake': return '#FF9800';
-      case 'ubi_claim': return '#9C27B0';
-      default: return '#757575';
-    }
+  const balanceValue = balance ? parseFloat(balance.total) : 0;
+
+  return (
+    <View style={styles.container}>
+      {/* Animated Background Gradient */}
+      <LinearGradient
+        colors={[colors.background.primary, '#0D0D15', colors.background.secondary]}
+        style={StyleSheet.absoluteFill}
+      />
+      
+      {/* Background Glow Orbs */}
+      <Animated.View 
+        style={[
+          styles.glowOrb,
+          styles.glowOrbPurple,
+          { opacity: Animated.add(0.3, Animated.multiply(glowAnim, 0.2)) }
+        ]} 
+      />
+      <Animated.View 
+        style={[
+          styles.glowOrb,
+          styles.glowOrbBlue,
+          { opacity: Animated.add(0.2, Animated.multiply(glowAnim, 0.15)) }
+        ]} 
+      />
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            tintColor={colors.primary.start}
+          />
+        }
+      >
+        {/* Status Bar */}
+        <Animated.View 
+          style={[
+            styles.statusBar,
+            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+          ]}
+        >
+          <View style={styles.connectionStatus}>
+            <View style={[styles.statusDot, { backgroundColor: isConnected ? colors.success.base : colors.error.base }]} />
+            <Text style={styles.statusText}>
+              {isConnected ? 'Connected' : 'Offline'}
+            </Text>
+          </View>
+          <View style={[styles.networkPill, { backgroundColor: `${getNetworkColor()}20` }]}>
+            <View style={[styles.networkDot, { backgroundColor: getNetworkColor() }]} />
+            <Text style={[styles.networkText, { color: getNetworkColor() }]}>
+              {network.toUpperCase()}
+            </Text>
+          </View>
+        </Animated.View>
+
+        {/* Error Banner */}
+        {lastError && (
+          <TouchableOpacity onPress={clearError}>
+            <GlassCard style={styles.errorCard} glow glowColor={colors.error.glow}>
+              <Text style={styles.errorText}>{lastError}</Text>
+              <Text style={styles.errorDismiss}>Tap to dismiss</Text>
+            </GlassCard>
+          </TouchableOpacity>
+        )}
+
+        {/* Main Balance Card */}
+        <Animated.View 
+          style={[
+            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+          ]}
+        >
+          <GlassCard style={styles.balanceCard} intensity="medium" glow animated>
+            {/* Gradient Border Effect */}
+            <LinearGradient
+              colors={['rgba(139, 92, 246, 0.3)', 'rgba(59, 130, 246, 0.1)', 'transparent']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.balanceGradientBorder}
+            />
+            
+            <Text style={styles.balanceLabel}>Total Balance</Text>
+            
+            <View style={styles.balanceRow}>
+              <AnimatedBalance 
+                value={balanceValue}
+                suffix=""
+                style={styles.balanceAmount}
+              />
+              <Text style={styles.balanceCurrency}>SHR</Text>
+            </View>
+
+            {balance && balance.unconfirmedSatoshis > 0 && (
+              <View style={styles.pendingRow}>
+                <View style={styles.pendingDot} />
+                <Text style={styles.pendingBalance}>
+                  +{formatAmount(balance.unconfirmed)} pending
+                </Text>
+              </View>
+            )}
+
+            {activeAccount && (
+              <TouchableOpacity style={styles.addressContainer}>
+                <Text style={styles.addressText} numberOfLines={1} ellipsizeMode="middle">
+                  {activeAccount.address}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </GlassCard>
+        </Animated.View>
+
+        {/* Quick Actions */}
+        <Animated.View 
+          style={[
+            styles.actionsContainer,
+            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+          ]}
+        >
+          <ActionButton
+            icon="↑"
+            label="Send"
+            color={gradients.error}
+            onPress={() => navigation.navigate('Send')}
+          />
+          <ActionButton
+            icon="↓"
+            label="Receive"
+            color={gradients.success}
+            onPress={() => navigation.navigate('Receive')}
+          />
+          <ActionButton
+            icon="◎"
+            label="Stake"
+            color={gradients.blue}
+            onPress={() => navigation.navigate('Staking')}
+          />
+          <ActionButton
+            icon="$"
+            label="UBI"
+            color={gradients.purple}
+            onPress={() => navigation.navigate('UBI')}
+          />
+        </Animated.View>
+
+        {/* UBI Card (if eligible) */}
+        {ubiInfo && ubiInfo.isEligible && parseFloat(ubiInfo.claimableAmount) > 0 && (
+          <Animated.View style={{ opacity: fadeAnim }}>
+            <TouchableOpacity onPress={() => navigation.navigate('UBI')}>
+              <LinearGradient
+                colors={gradients.purple}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.ubiCard}
+              >
+                <View style={styles.ubiContent}>
+                  <View>
+                    <Text style={styles.ubiLabel}>UBI Available</Text>
+                    <Text style={styles.ubiAmount}>
+                      {formatAmount(ubiInfo.claimableAmount)} SHR
+                    </Text>
+                  </View>
+                  <View style={styles.ubiAction}>
+                    <Text style={styles.ubiActionText}>Claim →</Text>
+                  </View>
+                </View>
+                
+                {/* Shine effect */}
+                <Animated.View 
+                  style={[
+                    styles.ubiShine,
+                    { opacity: glowAnim }
+                  ]} 
+                />
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+
+        {/* Recent Transactions */}
+        <Animated.View 
+          style={[
+            styles.transactionsSection,
+            { opacity: fadeAnim }
+          ]}
+        >
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recent Activity</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Transactions')}>
+              <Text style={styles.seeAllText}>See All</Text>
+            </TouchableOpacity>
+          </View>
+
+          {transactions.length === 0 ? (
+            <GlassCard style={styles.emptyState}>
+              <Text style={styles.emptyIcon}>📋</Text>
+              <Text style={styles.emptyText}>No transactions yet</Text>
+              {(network === 'testnet' || network === 'regtest') && (
+                <GradientButton
+                  title="Get Test SHR"
+                  onPress={() => navigation.navigate('Faucet')}
+                  size="small"
+                  colors={gradients.cyan}
+                  style={styles.faucetButton}
+                />
+              )}
+            </GlassCard>
+          ) : (
+            <GlassCard style={styles.transactionsList}>
+              {transactions.slice(0, 5).map((tx: Transaction, index: number) => (
+                <TouchableOpacity
+                  key={tx.txid}
+                  style={[
+                    styles.transactionItem,
+                    index < transactions.slice(0, 5).length - 1 && styles.transactionItemBorder
+                  ]}
+                  onPress={() => navigation.navigate('TransactionDetail', { txid: tx.txid })}
+                >
+                  <View style={[styles.txIconContainer, { backgroundColor: `${getTransactionColor(tx.type)}20` }]}>
+                    <Text style={[styles.txIcon, { color: getTransactionColor(tx.type) }]}>
+                      {tx.type === 'send' ? '↑' : tx.type === 'receive' ? '↓' : '$'}
+                    </Text>
+                  </View>
+                  <View style={styles.txDetails}>
+                    <Text style={styles.txType}>
+                      {tx.type.charAt(0).toUpperCase() + tx.type.slice(1).replace('_', ' ')}
+                    </Text>
+                    <Text style={styles.txTime}>
+                      {new Date(tx.timestamp * 1000).toLocaleDateString()}
+                    </Text>
+                  </View>
+                  <View style={styles.txAmountContainer}>
+                    <Text style={[styles.txAmount, { color: getTransactionColor(tx.type) }]}>
+                      {tx.type === 'send' ? '-' : '+'}{formatAmount(tx.amount)}
+                    </Text>
+                    <Text style={styles.txConfirmations}>
+                      {tx.confirmations === 0 ? 'Pending' : `${tx.confirmations} conf`}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </GlassCard>
+          )}
+        </Animated.View>
+      </ScrollView>
+    </View>
+  );
+};
+
+// Quick Action Button Component
+const ActionButton: React.FC<{
+  icon: string;
+  label: string;
+  color: string[];
+  onPress: () => void;
+}> = ({ icon, label, color, onPress }) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.9,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
+    <TouchableOpacity
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={1}
     >
-      {/* Connection Status */}
-      <View style={styles.statusBar}>
-        <View style={[styles.statusDot, { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }]} />
-        <Text style={styles.statusText}>
-          {isConnected ? 'Connected' : 'Disconnected'}
-        </Text>
-        <View style={[styles.networkBadge, { backgroundColor: getNetworkColor() }]}>
-          <Text style={styles.networkText}>{network.toUpperCase()}</Text>
-        </View>
-      </View>
-
-      {/* Error Banner */}
-      {lastError && (
-        <TouchableOpacity style={styles.errorBanner} onPress={clearError}>
-          <Text style={styles.errorText}>{lastError}</Text>
-          <Text style={styles.errorDismiss}>Tap to dismiss</Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Balance Card */}
-      <View style={styles.balanceCard}>
-        <Text style={styles.balanceLabel}>Total Balance</Text>
-        <Text style={styles.balanceAmount}>
-          {balance ? formatAmount(balance.total) : '0.00000000'} SHR
-        </Text>
-        {balance && balance.unconfirmedSatoshis > 0 && (
-          <Text style={styles.pendingBalance}>
-            +{formatAmount(balance.unconfirmed)} pending
-          </Text>
-        )}
-        {activeAccount && (
-          <Text style={styles.addressText} numberOfLines={1} ellipsizeMode="middle">
-            {activeAccount.address}
-          </Text>
-        )}
-      </View>
-
-      {/* Quick Actions */}
-      <View style={styles.actionsContainer}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => navigation.navigate('Send')}
+      <Animated.View style={[styles.actionButton, { transform: [{ scale: scaleAnim }] }]}>
+        <LinearGradient
+          colors={color}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.actionIconContainer}
         >
-          <View style={[styles.actionIcon, { backgroundColor: '#F44336' }]}>
-            <Text style={styles.actionIconText}>^</Text>
-          </View>
-          <Text style={styles.actionText}>Send</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => navigation.navigate('Receive')}
-        >
-          <View style={[styles.actionIcon, { backgroundColor: '#4CAF50' }]}>
-            <Text style={styles.actionIconText}>v</Text>
-          </View>
-          <Text style={styles.actionText}>Receive</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => navigation.navigate('Staking')}
-        >
-          <View style={[styles.actionIcon, { backgroundColor: '#2196F3' }]}>
-            <Text style={styles.actionIconText}>%</Text>
-          </View>
-          <Text style={styles.actionText}>Stake</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => navigation.navigate('UBI')}
-        >
-          <View style={[styles.actionIcon, { backgroundColor: '#9C27B0' }]}>
-            <Text style={styles.actionIconText}>$</Text>
-          </View>
-          <Text style={styles.actionText}>UBI</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* UBI Card (if eligible) */}
-      {ubiInfo && ubiInfo.isEligible && parseFloat(ubiInfo.claimableAmount) > 0 && (
-        <TouchableOpacity
-          style={styles.ubiCard}
-          onPress={() => navigation.navigate('UBI')}
-        >
-          <Text style={styles.ubiTitle}>UBI Available</Text>
-          <Text style={styles.ubiAmount}>
-            {formatAmount(ubiInfo.claimableAmount)} SHR
-          </Text>
-          <Text style={styles.ubiAction}>Tap to claim</Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Recent Transactions */}
-      <View style={styles.transactionsSection}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Recent Transactions</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Transactions')}>
-            <Text style={styles.seeAllText}>See All</Text>
-          </TouchableOpacity>
-        </View>
-
-        {isLoadingTransactions ? (
-          <ActivityIndicator style={styles.loader} />
-        ) : transactions.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No transactions yet</Text>
-            {(network === 'testnet' || network === 'regtest') && (
-              <TouchableOpacity
-                style={styles.faucetButton}
-                onPress={() => navigation.navigate('Faucet')}
-              >
-                <Text style={styles.faucetButtonText}>Get Test SHR</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        ) : (
-          transactions.slice(0, 5).map((tx: Transaction) => (
-            <TouchableOpacity
-              key={tx.txid}
-              style={styles.transactionItem}
-              onPress={() => navigation.navigate('TransactionDetail', { txid: tx.txid })}
-            >
-              <View style={[styles.txIcon, { backgroundColor: getTransactionColor(tx.type) }]}>
-                <Text style={styles.txIconText}>{getTransactionIcon(tx.type)}</Text>
-              </View>
-              <View style={styles.txDetails}>
-                <Text style={styles.txType}>
-                  {tx.type.charAt(0).toUpperCase() + tx.type.slice(1).replace('_', ' ')}
-                </Text>
-                <Text style={styles.txTime}>
-                  {new Date(tx.timestamp * 1000).toLocaleDateString()}
-                </Text>
-              </View>
-              <View style={styles.txAmountContainer}>
-                <Text style={[styles.txAmount, { color: getTransactionColor(tx.type) }]}>
-                  {tx.type === 'send' ? '-' : '+'}{formatAmount(tx.amount)} SHR
-                </Text>
-                <Text style={styles.txConfirmations}>
-                  {tx.confirmations === 0 ? 'Pending' : `${tx.confirmations} conf`}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))
-        )}
-      </View>
-    </ScrollView>
+          <Text style={styles.actionIcon}>{icon}</Text>
+        </LinearGradient>
+        <Text style={styles.actionLabel}>{label}</Text>
+      </Animated.View>
+    </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: colors.background.primary,
   },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 32,
+  },
+  
+  // Background effects
+  glowOrb: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+  },
+  glowOrbPurple: {
+    top: -100,
+    right: -100,
+    backgroundColor: colors.primary.start,
+  },
+  glowOrbBlue: {
+    top: 200,
+    left: -150,
+    backgroundColor: colors.primary.end,
+  },
+  
+  // Status bar
   statusBar: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    paddingTop: 8,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  connectionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginRight: 8,
+    marginRight: spacing.xs,
   },
   statusText: {
-    color: '#888',
+    color: colors.text.secondary,
     fontSize: 12,
-    flex: 1,
   },
-  networkBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
+  networkPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+  },
+  networkDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: spacing.xs,
   },
   networkText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
+    fontSize: 11,
+    fontWeight: '700',
   },
-  errorBanner: {
-    backgroundColor: '#F44336',
-    padding: 12,
-    marginHorizontal: 16,
-    borderRadius: 8,
-    marginBottom: 16,
+  
+  // Error card
+  errorCard: {
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderColor: colors.error.base,
   },
   errorText: {
-    color: '#fff',
+    color: colors.error.base,
     fontSize: 14,
   },
   errorDismiss: {
-    color: 'rgba(255,255,255,0.7)',
+    color: colors.text.muted,
     fontSize: 12,
     marginTop: 4,
   },
+  
+  // Balance card
   balanceCard: {
-    backgroundColor: '#1E1E1E',
-    margin: 16,
-    padding: 24,
-    borderRadius: 16,
+    marginHorizontal: spacing.md,
+    padding: spacing.xl,
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  balanceGradientBorder: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 2,
   },
   balanceLabel: {
-    color: '#888',
+    color: colors.text.secondary,
     fontSize: 14,
-    marginBottom: 8,
+    marginBottom: spacing.sm,
+  },
+  balanceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
   },
   balanceAmount: {
-    color: '#fff',
-    fontSize: 36,
-    fontWeight: 'bold',
+    fontSize: 42,
+    fontWeight: '800',
+    color: colors.text.primary,
+    letterSpacing: -1,
+  },
+  balanceCurrency: {
+    color: colors.text.secondary,
+    fontSize: 18,
+    fontWeight: '600',
+    marginLeft: spacing.sm,
+  },
+  pendingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  pendingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.warning.base,
+    marginRight: spacing.xs,
   },
   pendingBalance: {
-    color: '#FF9800',
+    color: colors.warning.base,
     fontSize: 14,
-    marginTop: 4,
+  },
+  addressContainer: {
+    marginTop: spacing.lg,
+    backgroundColor: colors.glass.light,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    maxWidth: '90%',
   },
   addressText: {
-    color: '#666',
+    color: colors.text.muted,
     fontSize: 12,
-    marginTop: 16,
-    maxWidth: '80%',
+    fontFamily: 'monospace',
   },
+  
+  // Quick actions
   actionsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingHorizontal: 16,
-    marginBottom: 24,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.xl,
+    marginBottom: spacing.lg,
   },
   actionButton: {
     alignItems: 'center',
   },
-  actionIcon: {
+  actionIconContainer: {
     width: 56,
     height: 56,
-    borderRadius: 28,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
+    ...shadows.button,
   },
-  actionIconText: {
+  actionIcon: {
     color: '#fff',
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
   },
-  actionText: {
-    color: '#fff',
+  actionLabel: {
+    color: colors.text.secondary,
     fontSize: 12,
+    fontWeight: '500',
   },
+  
+  // UBI card
   ubiCard: {
-    backgroundColor: '#9C27B0',
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.lg,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+    overflow: 'hidden',
+  },
+  ubiContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  ubiTitle: {
+  ubiLabel: {
     color: 'rgba(255,255,255,0.8)',
     fontSize: 14,
   },
   ubiAmount: {
     color: '#fff',
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginVertical: 4,
+    marginTop: 4,
   },
   ubiAction: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
   },
+  ubiActionText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  ubiShine: {
+    position: 'absolute',
+    top: 0,
+    left: -100,
+    width: 100,
+    height: '100%',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    transform: [{ skewX: '-20deg' }],
+  },
+  
+  // Transactions
   transactionsSection: {
-    padding: 16,
+    paddingHorizontal: spacing.md,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   sectionTitle: {
-    color: '#fff',
+    color: colors.text.primary,
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   seeAllText: {
-    color: '#2196F3',
+    color: colors.primary.start,
     fontSize: 14,
-  },
-  loader: {
-    marginVertical: 24,
+    fontWeight: '500',
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 32,
+    paddingVertical: spacing.xxl,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: spacing.md,
   },
   emptyText: {
-    color: '#666',
+    color: colors.text.secondary,
     fontSize: 16,
+    marginBottom: spacing.md,
   },
   faucetButton: {
-    marginTop: 16,
-    backgroundColor: '#2196F3',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    marginTop: spacing.sm,
   },
-  faucetButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+  transactionsList: {
+    padding: 0,
+    overflow: 'hidden',
   },
   transactionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1E1E1E',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
+    padding: spacing.md,
   },
-  txIcon: {
+  transactionItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.glass.borderLight,
+  },
+  txIconContainer: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: spacing.md,
   },
-  txIconText: {
-    color: '#fff',
-    fontSize: 16,
+  txIcon: {
+    fontSize: 18,
     fontWeight: 'bold',
   },
   txDetails: {
     flex: 1,
   },
   txType: {
-    color: '#fff',
+    color: colors.text.primary,
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   txTime: {
-    color: '#666',
+    color: colors.text.muted,
     fontSize: 12,
     marginTop: 2,
   },
@@ -447,10 +724,10 @@ const styles = StyleSheet.create({
   },
   txAmount: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   txConfirmations: {
-    color: '#666',
+    color: colors.text.muted,
     fontSize: 10,
     marginTop: 2,
   },

@@ -297,11 +297,11 @@ TEST(ProtocolTest, Constants) {
 }
 
 TEST(ProtocolTest, NetworkMagic) {
-    // MAINNET = "NXUS"
-    EXPECT_EQ(NetworkMagic::MAINNET[0], 'N');
-    EXPECT_EQ(NetworkMagic::MAINNET[1], 'X');
-    EXPECT_EQ(NetworkMagic::MAINNET[2], 'U');
-    EXPECT_EQ(NetworkMagic::MAINNET[3], 'S');
+    // MAINNET = "SHRM"
+    EXPECT_EQ(NetworkMagic::MAINNET[0], 'S');
+    EXPECT_EQ(NetworkMagic::MAINNET[1], 'H');
+    EXPECT_EQ(NetworkMagic::MAINNET[2], 'R');
+    EXPECT_EQ(NetworkMagic::MAINNET[3], 'M');
 }
 
 TEST(ProtocolTest, DefaultPorts) {

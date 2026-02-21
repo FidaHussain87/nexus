@@ -253,8 +253,25 @@ bool InitializeNode(NodeContext& node, const NodeInitOptions& options) {
     if (options.checkBlocks && nLoaded > 0) {
         LOG_INFO(util::LogCategory::DEFAULT) << "Verifying block index...";
         if (!VerifyBlockIndex(node, options.checkLevel)) {
-            LOG_WARN(util::LogCategory::DEFAULT) << "Block index verification found issues";
-            // Non-fatal for now
+            LOG_ERROR(util::LogCategory::DEFAULT) << "Block index verification FAILED - database may be corrupted";
+            
+            // Block index corruption is a serious issue that can lead to:
+            // 1. Following an invalid chain
+            // 2. Missing blocks in the chain
+            // 3. Incorrect consensus state
+            
+            // In strict mode (default for production), this is fatal
+            if (options.checkLevel >= 3) {
+                LOG_ERROR(util::LogCategory::DEFAULT) << "Fatal: Block index verification failed at check level " 
+                                                      << options.checkLevel << ". Please reindex with -reindex.";
+                return false;
+            }
+            
+            // In non-strict mode (check level < 3), warn but continue
+            // This allows recovery/debugging but should not be used in production
+            LOG_WARN(util::LogCategory::DEFAULT) << "Continuing despite block index issues (checkLevel=" 
+                                                 << options.checkLevel << " < 3). NOT SAFE FOR PRODUCTION!";
+            LOG_WARN(util::LogCategory::DEFAULT) << "Run with -reindex to rebuild the block index.";
         }
     }
     
@@ -809,11 +826,25 @@ bool ActivateBestChain(NodeContext& node) {
         return true;  // Not an error, just empty
     }
     
-    // Find block with most work (highest height for now, should use chainwork)
+    // Find block with most chainwork (not just height)
+    // Chainwork is cumulative difficulty and is the proper metric for chain selection
+    // This prevents attacks where an attacker creates a longer but lower-work chain
     BlockIndex* bestBlock = nullptr;
     for (const auto& [hash, indexPtr] : blockIndex) {
-        if (!bestBlock || indexPtr->nHeight > bestBlock->nHeight) {
+        if (!bestBlock) {
             bestBlock = indexPtr.get();
+            continue;
+        }
+        
+        // Compare chainwork (cumulative difficulty)
+        // Higher chainwork = more secure chain
+        if (indexPtr->nChainWork > bestBlock->nChainWork) {
+            bestBlock = indexPtr.get();
+        } else if (indexPtr->nChainWork == bestBlock->nChainWork) {
+            // If chainwork is equal, use height as tiebreaker (shouldn't happen normally)
+            if (indexPtr->nHeight > bestBlock->nHeight) {
+                bestBlock = indexPtr.get();
+            }
         }
     }
     

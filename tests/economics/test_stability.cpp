@@ -347,7 +347,7 @@ TEST_F(StabilityTest, StabilityControllerDecisionAboveBand) {
     StabilityDecision decision = controller_->CalculateDecision(100);
     
     // Price above target -> contract supply to reduce price
-    // (In reserve-based stablecoins: sell NXS from reserve)
+    // (In reserve-based stablecoins: sell SHR from reserve)
     EXPECT_EQ(decision.action, StabilityAction::ContractSupply);
     EXPECT_GT(decision.adjustmentBps, 0);
 }
@@ -360,7 +360,7 @@ TEST_F(StabilityTest, StabilityControllerDecisionBelowBand) {
     
     StabilityDecision decision = controller_->CalculateDecision(100);
     
-    // Price below target -> expand supply or buy NXS to raise price
+    // Price below target -> expand supply or buy SHR to raise price
     EXPECT_EQ(decision.action, StabilityAction::ExpandSupply);
     EXPECT_GT(decision.adjustmentBps, 0);
 }

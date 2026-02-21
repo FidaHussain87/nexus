@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Network Security Configuration for SHURIUM Wallet
+    
+    This config allows cleartext (HTTP) traffic for development purposes.
+    The wallet needs to connect to local SHURIUM nodes via JSON-RPC.
+    
+    For production releases, you should:
+    1. Use HTTPS for all external connections
+    2. Restrict cleartext to only localhost/development IPs
+-->
+<network-security-config>
+    <!-- Allow cleartext traffic for local development -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <!-- Trust system CAs -->
+            <certificates src="system" />
+            <!-- Trust user-added CAs (for development/testing) -->
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+    
+    <!-- Domain-specific configuration -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Localhost for Metro bundler and local node -->
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain> <!-- Android emulator localhost -->
+        <domain includeSubdomains="true">10.0.3.2</domain> <!-- Genymotion localhost -->
+        
+        <!-- Local network for connecting to SHURIUM nodes on LAN -->
+        <domain includeSubdomains="true">192.168.0.0</domain>
+        <domain includeSubdomains="true">192.168.1.0</domain>
+        
+        <!-- SHURIUM testnet seeds (if using HTTP) -->
+        <domain includeSubdomains="true">testnet-seed.shurium.org</domain>
+        <domain includeSubdomains="true">testnet-seed2.shurium.org</domain>
+    </domain-config>
+    
+    <!-- Debug overrides - only active in debug builds -->
+    <debug-overrides>
+        <trust-anchors>
+            <!-- Trust debug CAs -->
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>

@@ -649,7 +649,7 @@ Examples:
   shurium-cli help
   shurium-cli getblockchaininfo
   shurium-cli getblock "00000000..."
-  shurium-cli sendtoaddress "NXS1..." 10.5
+  shurium-cli sendtoaddress "SHR1..." 10.5
 )";
 }
 

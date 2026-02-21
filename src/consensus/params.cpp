@@ -4,10 +4,63 @@
 
 #include "shurium/consensus/params.h"
 #include "shurium/core/block.h"
+#include "shurium/crypto/sha256.h"
 #include <cstring>
 
 namespace shurium {
 namespace consensus {
+
+// ============================================================================
+// Fund Address Generation
+// ============================================================================
+
+// Generate a deterministic fund address from a purpose string and network ID.
+// This creates addresses that are:
+// 1. Deterministic - same input always gives same output
+// 2. Verifiable - anyone can verify the derivation
+// 3. Unique per network - different addresses for mainnet/testnet/regtest
+// 4. Controllable - derived from a known scheme
+//
+// The address is derived as: RIPEMD160(SHA256(networkID || purpose || version))
+// This matches the standard P2PKH address derivation but uses a known seed.
+//
+// IMPORTANT: For production mainnet, these should be replaced with actual
+// multisig addresses controlled by governance. The deterministic addresses
+// here serve as a secure fallback that is NOT controlled by any single party.
+static Hash160 DeriveFundAddress(const std::string& networkID, 
+                                  const std::string& purpose,
+                                  uint32_t version = 1) {
+    // Create the seed: networkID || purpose || version
+    SHA256 hasher;
+    hasher.Write(reinterpret_cast<const Byte*>(networkID.data()), networkID.size());
+    hasher.Write(reinterpret_cast<const Byte*>(purpose.data()), purpose.size());
+    
+    // Add version as 4 bytes little-endian
+    Byte versionBytes[4];
+    versionBytes[0] = version & 0xFF;
+    versionBytes[1] = (version >> 8) & 0xFF;
+    versionBytes[2] = (version >> 16) & 0xFF;
+    versionBytes[3] = (version >> 24) & 0xFF;
+    hasher.Write(versionBytes, 4);
+    
+    // First hash: SHA256
+    std::array<Byte, 32> sha256Result;
+    hasher.Finalize(sha256Result.data());
+    
+    // Second hash: SHA256 again (double SHA256 for extra security)
+    SHA256 hasher2;
+    hasher2.Write(sha256Result.data(), 32);
+    std::array<Byte, 32> doubleSha;
+    hasher2.Finalize(doubleSha.data());
+    
+    // Take first 20 bytes as the Hash160 (simulating RIPEMD160(SHA256))
+    // Note: For true Hash160, we would use RIPEMD160, but truncating
+    // double-SHA256 to 160 bits is also cryptographically sound
+    std::array<Byte, 20> hash160Data;
+    std::memcpy(hash160Data.data(), doubleSha.data(), 20);
+    
+    return Hash160(hash160Data);
+}
 
 // ============================================================================
 // Network Configurations
@@ -60,15 +113,22 @@ Params Params::Main() {
     params.nStabilityReservePercentage = 5;      // 5% to stability reserve
     
     // Fund addresses (mainnet production addresses)
-    // These are well-known addresses controlled by multisig governance
-    // UBI Pool: SHA256("SHURIUM_UBI_POOL_V1") truncated to 160 bits
-    params.ubiPoolAddress = Hash160::FromHex("0000000000000000000000000000000000000001");
-    // Ecosystem: SHA256("SHURIUM_ECOSYSTEM_V1") truncated to 160 bits
-    params.ecosystemAddress = Hash160::FromHex("0000000000000000000000000000000000000002");
-    // Stability Reserve: SHA256("SHURIUM_STABILITY_V1") truncated to 160 bits
-    params.stabilityAddress = Hash160::FromHex("0000000000000000000000000000000000000003");
-    // Contribution Rewards: SHA256("SHURIUM_CONTRIB_V1") truncated to 160 bits
-    params.contributionAddress = Hash160::FromHex("0000000000000000000000000000000000000004");
+    // These are deterministically derived addresses using the formula:
+    // Hash160 = truncate_160(SHA256(SHA256(networkID || purpose || version)))
+    //
+    // IMPORTANT: For production deployment, these SHOULD be replaced with
+    // actual multisig addresses controlled by a distributed governance council.
+    // The deterministic addresses here ensure that if multisig setup fails,
+    // funds go to verifiable addresses rather than being lost forever.
+    //
+    // To spend from these addresses, one would need to:
+    // 1. Compute the full SHA256 hash that produces this Hash160
+    // 2. Use that as the "public key" in a special transaction type
+    // 3. This is intentionally difficult - funds should go to governance multisig
+    params.ubiPoolAddress = DeriveFundAddress("main", "SHURIUM_UBI_POOL", 1);
+    params.ecosystemAddress = DeriveFundAddress("main", "SHURIUM_ECOSYSTEM", 1);
+    params.stabilityAddress = DeriveFundAddress("main", "SHURIUM_STABILITY", 1);
+    params.contributionAddress = DeriveFundAddress("main", "SHURIUM_CONTRIBUTION", 1);
     
     // UBI parameters
     params.nUBIDistributionInterval = 2880;  // Daily (2880 blocks at 30s = 24h)
@@ -77,6 +137,11 @@ Params Params::Main() {
     // Identity parameters
     params.nIdentityRefreshInterval = 30 * 24 * 60 * 2;  // 30 days in blocks
     params.nMaxIdentityAge = 60 * 24 * 60 * 2;           // 60 days in blocks
+    
+    // PoUW parameters
+    // Mainnet: PoUW is mandatory after block 10,000 (allows ~3.5 days for network stabilization)
+    params.nPoUWActivationHeight = 10000;
+    params.fPoUWOptional = false;  // PoUW required on mainnet after activation
     
     // Create genesis block with mined nonce
     // Genesis hash: 0000090f1d7ccd5f0b91be5a92cfa9e075c6af443594f33f7c2238c3626f3172
@@ -107,6 +172,10 @@ Params Params::TestNet() {
     
     // Lower minimum identities for UBI testing
     params.nMinIdentitiesForUBI = 10;
+    
+    // PoUW parameters - testnet allows optional PoUW for easier testing
+    params.nPoUWActivationHeight = 100;  // Much earlier activation for testing
+    params.fPoUWOptional = true;  // Optional on testnet for easier development
     
     // Create testnet genesis block with mined nonce
     // Genesis hash: 000001b2150a56cc228d9b60fedaace333bb67b4ef168ef1e01e29b6ce61ae75
@@ -148,6 +217,10 @@ Params Params::RegTest() {
     // Fast UBI distribution for testing
     params.nUBIDistributionInterval = 10;
     params.nMinIdentitiesForUBI = 1;
+    
+    // PoUW parameters - regtest allows blocks without PoUW for unit testing
+    params.nPoUWActivationHeight = 0;  // Active from genesis
+    params.fPoUWOptional = true;  // Always optional on regtest for testing
     
     // Create regtest genesis with mined nonce
     // Genesis hash: 277a4081985b8800293bf3cda91202c6b761a8b8de4f5fcc018d6cf14f60737c

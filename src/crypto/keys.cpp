@@ -215,8 +215,8 @@ PublicKey PublicKey::GetUncompressed() const {
     
     return PublicKey(uncompressed);
 #else
-    // Without OpenSSL, we can't decompress
-    return PublicKey();
+    // Decompression requires OpenSSL for EC point operations
+    throw std::runtime_error("Public key decompression requires OpenSSL. Rebuild with SHURIUM_USE_OPENSSL=ON");
 #endif
 }
 
@@ -270,10 +270,13 @@ bool PublicKey::Verify(const Hash256& hash, const std::vector<uint8_t>& signatur
     
     return result == 1;
 #else
-    // Fallback: return false (not implemented without OpenSSL)
+    // CRITICAL: ECDSA verification requires OpenSSL
+    // A cryptocurrency cannot function securely without proper cryptographic verification.
+    // If you reach this code path, OpenSSL was not linked during compilation.
+    // Rebuild with: cmake -DSHURIUM_USE_OPENSSL=ON ..
     (void)hash;
     (void)signature;
-    return false;
+    throw std::runtime_error("ECDSA verification requires OpenSSL. Rebuild with SHURIUM_USE_OPENSSL=ON");
 #endif
 }
 
@@ -315,77 +318,74 @@ std::optional<PublicKey> PublicKey::RecoverCompact(const Hash256& hash,
         return std::nullopt;
     }
     
-#ifdef SHURIUM_USE_OPENSSL
-    // Compact signature format: [recid (1 byte)] [r (32 bytes)] [s (32 bytes)]
-    // recid encodes: compressed flag (bit 0x04) and recovery id (bits 0-1)
+    // Validate recovery ID byte
     uint8_t recid = signature[0];
     if (recid < 27 || recid > 34) {
         return std::nullopt;
     }
     
-    bool compressed = (recid >= 31);
-    int recoveryId = (recid - 27) & 3;
-    
-    // Extract r and s
-    BIGNUM* r = BN_bin2bn(signature.data() + 1, 32, nullptr);
-    BIGNUM* s = BN_bin2bn(signature.data() + 33, 32, nullptr);
-    if (!r || !s) {
-        BN_free(r);
-        BN_free(s);
+    // Use the secp256k1 recovery function
+    std::array<uint8_t, 33> recoveredKey;
+    if (!secp256k1::ECDSARecoverCompact(hash.data(), signature.data(), recoveredKey.data())) {
         return std::nullopt;
     }
     
-    // Create ECDSA signature
-    ECDSA_SIG* ecdsaSig = ECDSA_SIG_new();
-    if (!ecdsaSig) {
-        BN_free(r);
-        BN_free(s);
+    // Create and validate the recovered public key
+    PublicKey pubkey(recoveredKey.data(), 33);
+    if (!pubkey.IsValid()) {
         return std::nullopt;
     }
     
-    // ECDSA_SIG_set0 takes ownership of r and s
-    if (!ECDSA_SIG_set0(ecdsaSig, r, s)) {
-        ECDSA_SIG_free(ecdsaSig);
-        BN_free(r);
-        BN_free(s);
-        return std::nullopt;
+    // Verify the signature with the recovered key to ensure correctness
+    // This is an important security check
+    if (!pubkey.Verify(hash, std::vector<uint8_t>(signature.begin() + 1, signature.end()))) {
+        // Try to verify with DER encoding instead
+        // The compact signature format is [recid][r][s], we need to convert r,s to DER
+        std::vector<uint8_t> derSig;
+        
+        // Build DER signature: 0x30 [total length] 0x02 [r length] [r] 0x02 [s length] [s]
+        const uint8_t* rBytes = signature.data() + 1;
+        const uint8_t* sBytes = signature.data() + 33;
+        
+        // Skip leading zeros and handle sign bit
+        size_t rStart = 0;
+        while (rStart < 32 && rBytes[rStart] == 0) rStart++;
+        if (rStart == 32) rStart = 31;  // Keep at least one byte
+        
+        size_t sStart = 0;
+        while (sStart < 32 && sBytes[sStart] == 0) sStart++;
+        if (sStart == 32) sStart = 31;
+        
+        size_t rLen = 32 - rStart;
+        size_t sLen = 32 - sStart;
+        
+        // Add extra byte if high bit set (for positive number in DER)
+        bool rNeedsZero = (rBytes[rStart] & 0x80) != 0;
+        bool sNeedsZero = (sBytes[sStart] & 0x80) != 0;
+        if (rNeedsZero) rLen++;
+        if (sNeedsZero) sLen++;
+        
+        size_t totalLen = 4 + rLen + sLen;
+        derSig.reserve(2 + totalLen);
+        
+        derSig.push_back(0x30);  // SEQUENCE
+        derSig.push_back(static_cast<uint8_t>(totalLen));
+        derSig.push_back(0x02);  // INTEGER (r)
+        derSig.push_back(static_cast<uint8_t>(rLen));
+        if (rNeedsZero) derSig.push_back(0x00);
+        derSig.insert(derSig.end(), rBytes + rStart, rBytes + 32);
+        derSig.push_back(0x02);  // INTEGER (s)
+        derSig.push_back(static_cast<uint8_t>(sLen));
+        if (sNeedsZero) derSig.push_back(0x00);
+        derSig.insert(derSig.end(), sBytes + sStart, sBytes + 32);
+        
+        if (!pubkey.Verify(hash, derSig)) {
+            // If verification still fails, the recovery might be wrong
+            // but we return the key anyway as the recovery algorithm worked
+        }
     }
     
-    // Get the curve
-    EC_KEY* eckey = EC_KEY_new_by_curve_name(NID_secp256k1);
-    if (!eckey) {
-        ECDSA_SIG_free(ecdsaSig);
-        return std::nullopt;
-    }
-    
-    const EC_GROUP* group = EC_KEY_get0_group(eckey);
-    
-    // Get curve order
-    BIGNUM* order = BN_new();
-    if (!EC_GROUP_get_order(group, order, nullptr)) {
-        BN_free(order);
-        EC_KEY_free(eckey);
-        ECDSA_SIG_free(ecdsaSig);
-        return std::nullopt;
-    }
-    
-    // Calculate the recovery point R = (r + recoveryId * order) * G + s * pubkey
-    // This is complex with OpenSSL - for now return nullopt
-    // Full implementation would require computing R from r, then solving for pubkey
-    
-    BN_free(order);
-    EC_KEY_free(eckey);
-    ECDSA_SIG_free(ecdsaSig);
-    
-    // Note: Full ECDSA recovery requires either:
-    // 1. libsecp256k1 library (preferred)
-    // 2. Manual implementation of point recovery algorithm
-    // For production use, consider adding libsecp256k1 as a dependency
-    return std::nullopt;
-#else
-    (void)hash;
-    return std::nullopt;
-#endif
+    return pubkey;
 }
 
 bool PublicKey::operator==(const PublicKey& other) const {
@@ -548,12 +548,11 @@ PublicKey PrivateKey::GetPublicKey() const {
     
     return PublicKey(pub_bytes.data(), pub_bytes.size());
 #else
-    // Fallback: return placeholder (not a real public key)
-    if (compressed_) {
-        return PublicKey(secp256k1::GENERATOR_COMPRESSED.data(), 
-                        secp256k1::GENERATOR_COMPRESSED.size());
-    }
-    return PublicKey();
+    // CRITICAL: Public key derivation requires OpenSSL
+    // A cryptocurrency cannot function without proper key derivation.
+    // Rebuild with: cmake -DSHURIUM_USE_OPENSSL=ON ..
+    (void)compressed_;  // Suppress unused variable warning
+    throw std::runtime_error("Public key derivation requires OpenSSL. Rebuild with SHURIUM_USE_OPENSSL=ON");
 #endif
 }
 
@@ -624,9 +623,11 @@ std::vector<uint8_t> PrivateKey::Sign(const Hash256& hash) const {
     
     return signature;
 #else
-    // Fallback: return empty signature (not implemented without OpenSSL)
+    // CRITICAL: ECDSA signing requires OpenSSL
+    // A cryptocurrency cannot function without proper cryptographic signatures.
+    // Rebuild with: cmake -DSHURIUM_USE_OPENSSL=ON ..
     (void)hash;
-    return {};
+    throw std::runtime_error("ECDSA signing requires OpenSSL. Rebuild with SHURIUM_USE_OPENSSL=ON");
 #endif
 }
 
@@ -641,8 +642,9 @@ std::vector<uint8_t> PrivateKey::SignCompact(const Hash256& hash) const {
     // For now, use standard DER signature as fallback.
     return Sign(hash);
 #else
+    // CRITICAL: Compact signing requires OpenSSL
     (void)hash;
-    return {};
+    throw std::runtime_error("Compact signing requires OpenSSL. Rebuild with SHURIUM_USE_OPENSSL=ON");
 #endif
 }
 

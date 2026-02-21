@@ -126,7 +126,7 @@ std::string FormatShurium(Amount amount) {
         }
     }
     
-    return result + " NXS";
+    return result + " SHR";
 }
 
 // ============================================================================

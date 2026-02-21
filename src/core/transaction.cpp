@@ -63,14 +63,14 @@ std::string TxOut::ToString() const {
     if (IsNull()) {
         ss << "null";
     } else {
-        // Convert to NXS for display
+        // Convert to SHR for display
         int64_t wholePart = nValue / COIN;
         int64_t fractionalPart = nValue % COIN;
         ss << wholePart;
         if (fractionalPart > 0) {
             ss << "." << std::setfill('0') << std::setw(8) << fractionalPart;
         }
-        ss << " NXS";
+        ss << " SHR";
     }
     ss << ", scriptPubKey=" << scriptPubKey.size() << " bytes)";
     return ss.str();

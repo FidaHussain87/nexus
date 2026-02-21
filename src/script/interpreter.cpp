@@ -153,9 +153,46 @@ bool IsLowDERSignature(const std::vector<uint8_t>& sig, ScriptError* error) {
     }
     
     // Extract S value and check if it's low
-    // For now, accept all valid DER signatures
-    // Full implementation would compare S against curve order/2
-    return true;
+    // In DER format: 0x30 [length] 0x02 [r_length] [r] 0x02 [s_length] [s] [sighash]
+    // A signature is "low-S" if S <= curve_order/2
+    // This is a malleability fix (BIP 66/146)
+    
+    // Skip to S value
+    size_t rLen = sig[3];
+    size_t sPos = 4 + rLen;
+    size_t sLen = sig[sPos + 1];
+    
+    // secp256k1 curve order / 2 (in big-endian)
+    // order = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+    // order/2 = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0
+    static const uint8_t halfOrder[] = {
+        0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+        0x5D, 0x57, 0x6E, 0x73, 0x57, 0xA4, 0x50, 0x1D,
+        0xDF, 0xE9, 0x2F, 0x46, 0x68, 0x1B, 0x20, 0xA0
+    };
+    
+    // Extract S value (skip 0x02 and length byte)
+    const uint8_t* sVal = &sig[sPos + 2];
+    
+    // Compare S against halfOrder
+    // S must be <= halfOrder for low-S
+    
+    // Pad S with leading zeros if necessary for comparison
+    size_t padLen = sLen < 32 ? 32 - sLen : 0;
+    
+    for (size_t i = 0; i < 32; ++i) {
+        uint8_t sBytes = (i < padLen) ? 0 : sVal[i - padLen];
+        if (sBytes < halfOrder[i]) {
+            return true;  // S is less than halfOrder, it's low
+        }
+        if (sBytes > halfOrder[i]) {
+            if (error) *error = ScriptError::SIG_HIGH_S;
+            return false;  // S is greater than halfOrder, it's high
+        }
+    }
+    
+    return true;  // S equals halfOrder, considered low
 }
 
 // ============================================================================

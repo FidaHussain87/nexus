@@ -1,9 +1,9 @@
 /**
  * SHURIUM Mobile Wallet - Settings Screen
- * Network configuration, security, and app settings
+ * Premium glassmorphism design for settings and configuration
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,11 +12,61 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
-  TextInput,
   Modal,
+  Animated,
+  Pressable,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { useWalletStore } from '../store/wallet';
+import { colors, gradients, spacing, radius, shadows, typography } from '../theme';
+import { GlassCard, GlassButton } from '../components/ui';
 import type { NetworkType } from '../types';
+
+interface SettingItemProps {
+  icon: string;
+  label: string;
+  value?: string;
+  description?: string;
+  onPress?: () => void;
+  rightElement?: React.ReactNode;
+  danger?: boolean;
+}
+
+const SettingItem: React.FC<SettingItemProps> = ({
+  icon,
+  label,
+  value,
+  description,
+  onPress,
+  rightElement,
+  danger = false,
+}) => (
+  <Pressable 
+    style={styles.settingItem}
+    onPress={onPress}
+    disabled={!onPress}
+  >
+    <View style={styles.settingIcon}>
+      <Text style={styles.settingIconText}>{icon}</Text>
+    </View>
+    <View style={styles.settingInfo}>
+      <Text style={[styles.settingLabel, danger && styles.settingLabelDanger]}>
+        {label}
+      </Text>
+      {description && (
+        <Text style={[styles.settingDescription, danger && styles.settingDescDanger]}>
+          {description}
+        </Text>
+      )}
+      {value && (
+        <Text style={styles.settingValue}>{value}</Text>
+      )}
+    </View>
+    {rightElement || (onPress && (
+      <Text style={[styles.chevron, danger && styles.chevronDanger]}>›</Text>
+    ))}
+  </Pressable>
+);
 
 export const SettingsScreen: React.FC = () => {
   const {
@@ -36,10 +86,30 @@ export const SettingsScreen: React.FC = () => {
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
-  const networks: { type: NetworkType; name: string; description: string }[] = [
-    { type: 'mainnet', name: 'Mainnet', description: 'Production network with real SHR' },
-    { type: 'testnet', name: 'Testnet', description: 'Test network for development' },
-    { type: 'regtest', name: 'Regtest', description: 'Local regression testing' },
+  // Animations
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        damping: 15,
+        stiffness: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const networks: { type: NetworkType; name: string; description: string; icon: string }[] = [
+    { type: 'mainnet', name: 'Mainnet', description: 'Production network', icon: '🌐' },
+    { type: 'testnet', name: 'Testnet', description: 'Test network', icon: '🧪' },
+    { type: 'regtest', name: 'Regtest', description: 'Local testing', icon: '🔧' },
   ];
 
   const handleNetworkChange = (newNetwork: NetworkType) => {
@@ -50,7 +120,7 @@ export const SettingsScreen: React.FC = () => {
 
     Alert.alert(
       'Change Network',
-      `Switch to ${newNetwork}? Your wallet will reconnect to the new network.`,
+      `Switch to ${newNetwork}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -73,16 +143,10 @@ export const SettingsScreen: React.FC = () => {
         {
           text: 'Show Phrase',
           onPress: () => {
-            // In production, this would show the actual mnemonic from secure storage
             Alert.alert(
               'Recovery Phrase',
               'This feature will display your 24-word recovery phrase.\n\nNever share this with anyone!',
-              [
-                { 
-                  text: 'I Understand', 
-                  onPress: () => setBackupComplete() 
-                }
-              ]
+              [{ text: 'I Understand', onPress: () => setBackupComplete() }]
             );
           },
         },
@@ -96,10 +160,7 @@ export const SettingsScreen: React.FC = () => {
       'Lock your wallet now?',
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Lock',
-          onPress: () => lockWallet(),
-        },
+        { text: 'Lock', onPress: () => lockWallet() },
       ]
     );
   };
@@ -107,7 +168,7 @@ export const SettingsScreen: React.FC = () => {
   const handleResetWallet = () => {
     Alert.alert(
       'Reset Wallet',
-      'This will delete all wallet data from this device. Make sure you have your recovery phrase backed up!',
+      'This will delete all wallet data. Make sure you have your recovery phrase!',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -116,14 +177,10 @@ export const SettingsScreen: React.FC = () => {
           onPress: () => {
             Alert.alert(
               'Confirm Reset',
-              'Are you absolutely sure? This action cannot be undone.',
+              'Are you absolutely sure? This cannot be undone.',
               [
                 { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Yes, Reset',
-                  style: 'destructive',
-                  onPress: () => reset(),
-                },
+                { text: 'Yes, Reset', style: 'destructive', onPress: () => reset() },
               ]
             );
           },
@@ -134,139 +191,165 @@ export const SettingsScreen: React.FC = () => {
 
   const activeAccount = accounts.find(a => a.id === activeAccountId);
 
+  const getNetworkIcon = () => {
+    switch (network) {
+      case 'mainnet': return '🌐';
+      case 'testnet': return '🧪';
+      case 'regtest': return '🔧';
+    }
+  };
+
   return (
-    <ScrollView style={styles.container}>
-      {/* Network Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Network</Text>
-        <TouchableOpacity 
-          style={styles.settingItem}
-          onPress={() => setShowNetworkModal(true)}
-        >
-          <View style={styles.settingInfo}>
-            <Text style={styles.settingLabel}>Current Network</Text>
-            <Text style={styles.settingValue}>{network.charAt(0).toUpperCase() + network.slice(1)}</Text>
-          </View>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
+    <View style={styles.container}>
+      {/* Background */}
+      <View style={styles.backgroundOrbs}>
+        <Animated.View style={[styles.orb, styles.orb1, { opacity: fadeAnim }]} />
+        <Animated.View style={[styles.orb, styles.orb2, { opacity: fadeAnim }]} />
       </View>
 
-      {/* Account Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account</Text>
-        <TouchableOpacity 
-          style={styles.settingItem}
-          onPress={() => setShowAccountModal(true)}
-        >
-          <View style={styles.settingInfo}>
-            <Text style={styles.settingLabel}>Active Account</Text>
-            <Text style={styles.settingValue}>{activeAccount?.name || 'Default'}</Text>
+      <ScrollView 
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View style={{ 
+          opacity: fadeAnim, 
+          transform: [{ translateY: slideAnim }] 
+        }}>
+          {/* Network Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>NETWORK</Text>
+            <GlassCard style={styles.sectionCard} intensity="light">
+              <SettingItem
+                icon={getNetworkIcon()}
+                label="Current Network"
+                value={network.charAt(0).toUpperCase() + network.slice(1)}
+                onPress={() => setShowNetworkModal(true)}
+              />
+            </GlassCard>
           </View>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
-        <View style={styles.settingItem}>
-          <View style={styles.settingInfo}>
-            <Text style={styles.settingLabel}>Address</Text>
-            <Text style={styles.settingValueSmall} numberOfLines={1}>
-              {activeAccount?.address || 'No address'}
-            </Text>
-          </View>
-        </View>
-      </View>
 
-      {/* Security Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Security</Text>
-        
-        <View style={styles.settingItem}>
-          <View style={styles.settingInfo}>
-            <Text style={styles.settingLabel}>Biometric Unlock</Text>
-            <Text style={styles.settingDescription}>Use Face ID / Touch ID</Text>
+          {/* Account Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>ACCOUNT</Text>
+            <GlassCard style={styles.sectionCard} intensity="light">
+              <SettingItem
+                icon="👤"
+                label="Active Account"
+                value={activeAccount?.name || 'Default'}
+                onPress={() => setShowAccountModal(true)}
+              />
+              <View style={styles.divider} />
+              <SettingItem
+                icon="📋"
+                label="Address"
+                description={activeAccount?.address 
+                  ? `${activeAccount.address.substring(0, 16)}...${activeAccount.address.slice(-8)}`
+                  : 'No address'}
+              />
+            </GlassCard>
           </View>
-          <Switch
-            value={biometricEnabled}
-            onValueChange={setBiometricEnabled}
-            trackColor={{ false: '#333', true: '#2196F3' }}
-            thumbColor="#fff"
-          />
-        </View>
 
-        <TouchableOpacity style={styles.settingItem} onPress={handleBackupWallet}>
-          <View style={styles.settingInfo}>
-            <Text style={styles.settingLabel}>Backup Wallet</Text>
-            <Text style={[
-              styles.settingDescription,
-              { color: hasBackup ? '#4CAF50' : '#FF9800' }
-            ]}>
-              {hasBackup ? 'Backup completed' : 'Not backed up - tap to backup'}
-            </Text>
+          {/* Security Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>SECURITY</Text>
+            <GlassCard style={styles.sectionCard} intensity="light">
+              <SettingItem
+                icon="🔐"
+                label="Biometric Unlock"
+                description="Use Face ID / Touch ID"
+                rightElement={
+                  <Switch
+                    value={biometricEnabled}
+                    onValueChange={setBiometricEnabled}
+                    trackColor={{ false: colors.glass.light, true: colors.primary.start }}
+                    thumbColor="#fff"
+                  />
+                }
+              />
+              <View style={styles.divider} />
+              <SettingItem
+                icon="📝"
+                label="Backup Wallet"
+                description={hasBackup ? 'Backup completed' : 'Not backed up - tap to backup'}
+                onPress={handleBackupWallet}
+                rightElement={
+                  <View style={[
+                    styles.backupIndicator,
+                    { backgroundColor: hasBackup ? colors.success.base : colors.warning.base }
+                  ]}>
+                    <Text style={styles.backupIndicatorText}>
+                      {hasBackup ? '✓' : '!'}
+                    </Text>
+                  </View>
+                }
+              />
+              <View style={styles.divider} />
+              <SettingItem
+                icon="🔒"
+                label="Lock Wallet"
+                description="Lock immediately"
+                onPress={handleLockWallet}
+              />
+            </GlassCard>
           </View>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
 
-        <TouchableOpacity style={styles.settingItem} onPress={handleLockWallet}>
-          <View style={styles.settingInfo}>
-            <Text style={styles.settingLabel}>Lock Wallet</Text>
-            <Text style={styles.settingDescription}>Lock immediately</Text>
+          {/* Notifications Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>NOTIFICATIONS</Text>
+            <GlassCard style={styles.sectionCard} intensity="light">
+              <SettingItem
+                icon="🔔"
+                label="Push Notifications"
+                description="Transaction alerts"
+                rightElement={
+                  <Switch
+                    value={notificationsEnabled}
+                    onValueChange={setNotificationsEnabled}
+                    trackColor={{ false: colors.glass.light, true: colors.primary.start }}
+                    thumbColor="#fff"
+                  />
+                }
+              />
+            </GlassCard>
           </View>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
-      </View>
 
-      {/* Notifications Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Notifications</Text>
-        
-        <View style={styles.settingItem}>
-          <View style={styles.settingInfo}>
-            <Text style={styles.settingLabel}>Push Notifications</Text>
-            <Text style={styles.settingDescription}>Transaction alerts</Text>
+          {/* About Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>ABOUT</Text>
+            <GlassCard style={styles.sectionCard} intensity="light">
+              <SettingItem
+                icon="ℹ️"
+                label="Version"
+                value="0.1.0"
+              />
+              <View style={styles.divider} />
+              <SettingItem
+                icon="🌍"
+                label="SHURIUM Network"
+                description="Cryptocurrency with Universal Basic Income"
+              />
+            </GlassCard>
           </View>
-          <Switch
-            value={notificationsEnabled}
-            onValueChange={setNotificationsEnabled}
-            trackColor={{ false: '#333', true: '#2196F3' }}
-            thumbColor="#fff"
-          />
-        </View>
-      </View>
 
-      {/* About Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>About</Text>
-        
-        <View style={styles.settingItem}>
-          <View style={styles.settingInfo}>
-            <Text style={styles.settingLabel}>Version</Text>
-            <Text style={styles.settingValue}>0.1.0</Text>
+          {/* Danger Zone */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, styles.dangerTitle]}>DANGER ZONE</Text>
+            <GlassCard style={styles.dangerCard} intensity="light">
+              <LinearGradient
+                colors={['rgba(239, 68, 68, 0.1)', 'rgba(239, 68, 68, 0.05)']}
+                style={StyleSheet.absoluteFill}
+              />
+              <SettingItem
+                icon="⚠️"
+                label="Reset Wallet"
+                description="Delete all wallet data"
+                onPress={handleResetWallet}
+                danger
+              />
+            </GlassCard>
           </View>
-        </View>
-
-        <View style={styles.settingItem}>
-          <View style={styles.settingInfo}>
-            <Text style={styles.settingLabel}>SHURIUM Network</Text>
-            <Text style={styles.settingDescription}>
-              Cryptocurrency with Universal Basic Income
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Danger Zone */}
-      <View style={[styles.section, styles.dangerSection]}>
-        <Text style={[styles.sectionTitle, { color: '#F44336' }]}>Danger Zone</Text>
-        
-        <TouchableOpacity 
-          style={[styles.settingItem, styles.dangerItem]}
-          onPress={handleResetWallet}
-        >
-          <View style={styles.settingInfo}>
-            <Text style={[styles.settingLabel, { color: '#F44336' }]}>Reset Wallet</Text>
-            <Text style={styles.settingDescription}>Delete all wallet data</Text>
-          </View>
-          <Text style={[styles.chevron, { color: '#F44336' }]}>›</Text>
-        </TouchableOpacity>
-      </View>
+        </Animated.View>
+      </ScrollView>
 
       {/* Network Selection Modal */}
       <Modal
@@ -276,11 +359,15 @@ export const SettingsScreen: React.FC = () => {
         onRequestClose={() => setShowNetworkModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <GlassCard style={styles.modalContent} intensity="heavy">
+            <LinearGradient
+              colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+              style={StyleSheet.absoluteFill}
+            />
             <Text style={styles.modalTitle}>Select Network</Text>
             
             {networks.map((net) => (
-              <TouchableOpacity
+              <Pressable
                 key={net.type}
                 style={[
                   styles.networkOption,
@@ -288,6 +375,13 @@ export const SettingsScreen: React.FC = () => {
                 ]}
                 onPress={() => handleNetworkChange(net.type)}
               >
+                <LinearGradient
+                  colors={network === net.type 
+                    ? ['rgba(139, 92, 246, 0.2)', 'rgba(59, 130, 246, 0.2)']
+                    : ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']}
+                  style={StyleSheet.absoluteFill}
+                />
+                <Text style={styles.networkIcon}>{net.icon}</Text>
                 <View style={styles.networkInfo}>
                   <Text style={[
                     styles.networkName,
@@ -298,18 +392,25 @@ export const SettingsScreen: React.FC = () => {
                   <Text style={styles.networkDescription}>{net.description}</Text>
                 </View>
                 {network === net.type && (
-                  <Text style={styles.checkmark}>✓</Text>
+                  <View style={styles.checkmark}>
+                    <LinearGradient
+                      colors={gradients.primary}
+                      style={styles.checkmarkGradient}
+                    >
+                      <Text style={styles.checkmarkText}>✓</Text>
+                    </LinearGradient>
+                  </View>
                 )}
-              </TouchableOpacity>
+              </Pressable>
             ))}
 
-            <TouchableOpacity 
+            <Pressable 
               style={styles.modalCloseButton}
               onPress={() => setShowNetworkModal(false)}
             >
               <Text style={styles.modalCloseText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
+            </Pressable>
+          </GlassCard>
         </View>
       </Modal>
 
@@ -321,11 +422,15 @@ export const SettingsScreen: React.FC = () => {
         onRequestClose={() => setShowAccountModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <GlassCard style={styles.modalContent} intensity="heavy">
+            <LinearGradient
+              colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+              style={StyleSheet.absoluteFill}
+            />
             <Text style={styles.modalTitle}>Select Account</Text>
             
             {accounts.map((account) => (
-              <TouchableOpacity
+              <Pressable
                 key={account.id}
                 style={[
                   styles.networkOption,
@@ -336,6 +441,15 @@ export const SettingsScreen: React.FC = () => {
                   setShowAccountModal(false);
                 }}
               >
+                <LinearGradient
+                  colors={activeAccountId === account.id 
+                    ? ['rgba(139, 92, 246, 0.2)', 'rgba(59, 130, 246, 0.2)']
+                    : ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']}
+                  style={StyleSheet.absoluteFill}
+                />
+                <View style={styles.accountIcon}>
+                  <Text>👤</Text>
+                </View>
                 <View style={styles.networkInfo}>
                   <Text style={[
                     styles.networkName,
@@ -344,87 +458,152 @@ export const SettingsScreen: React.FC = () => {
                     {account.name}
                   </Text>
                   <Text style={styles.networkDescription} numberOfLines={1}>
-                    {account.address}
+                    {account.address.substring(0, 20)}...
                   </Text>
                 </View>
                 {activeAccountId === account.id && (
-                  <Text style={styles.checkmark}>✓</Text>
+                  <View style={styles.checkmark}>
+                    <LinearGradient
+                      colors={gradients.primary}
+                      style={styles.checkmarkGradient}
+                    >
+                      <Text style={styles.checkmarkText}>✓</Text>
+                    </LinearGradient>
+                  </View>
                 )}
-              </TouchableOpacity>
+              </Pressable>
             ))}
 
-            <TouchableOpacity 
+            <Pressable 
               style={styles.modalCloseButton}
               onPress={() => setShowAccountModal(false)}
             >
               <Text style={styles.modalCloseText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
+            </Pressable>
+          </GlassCard>
         </View>
       </Modal>
-    </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: colors.background.primary,
+  },
+  backgroundOrbs: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+  },
+  orb: {
+    position: 'absolute',
+    borderRadius: 9999,
+  },
+  orb1: {
+    width: 300,
+    height: 300,
+    top: -100,
+    right: -100,
+    backgroundColor: 'rgba(139, 92, 246, 0.08)',
+  },
+  orb2: {
+    width: 200,
+    height: 200,
+    bottom: 100,
+    left: -50,
+    backgroundColor: 'rgba(59, 130, 246, 0.06)',
+  },
+  scrollView: {
+    flex: 1,
   },
   section: {
-    marginTop: 24,
-    paddingHorizontal: 16,
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.md,
   },
   sectionTitle: {
-    color: '#888',
+    color: colors.text.muted,
     fontSize: 12,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
-    marginBottom: 8,
-    marginLeft: 4,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: spacing.sm,
+    marginLeft: spacing.xs,
+  },
+  dangerTitle: {
+    color: colors.error.base,
+  },
+  sectionCard: {
+    overflow: 'hidden',
+  },
+  dangerCard: {
+    overflow: 'hidden',
+    marginBottom: spacing.xxl,
   },
   settingItem: {
-    backgroundColor: '#1E1E1E',
-    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    padding: spacing.md,
+  },
+  settingIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.glass.light,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  settingIconText: {
+    fontSize: 18,
   },
   settingInfo: {
     flex: 1,
   },
   settingLabel: {
-    color: '#fff',
-    fontSize: 16,
+    color: colors.text.primary,
+    fontSize: typography.body.fontSize,
+    fontWeight: '500',
   },
-  settingValue: {
-    color: '#888',
-    fontSize: 14,
-    marginTop: 2,
-  },
-  settingValueSmall: {
-    color: '#666',
-    fontSize: 12,
-    marginTop: 2,
-    fontFamily: 'monospace',
+  settingLabelDanger: {
+    color: colors.error.base,
   },
   settingDescription: {
-    color: '#666',
-    fontSize: 12,
+    color: colors.text.tertiary,
+    fontSize: typography.small.fontSize,
+    marginTop: 2,
+  },
+  settingDescDanger: {
+    color: 'rgba(239, 68, 68, 0.7)',
+  },
+  settingValue: {
+    color: colors.text.secondary,
+    fontSize: typography.caption.fontSize,
     marginTop: 2,
   },
   chevron: {
-    color: '#666',
+    color: colors.text.muted,
     fontSize: 24,
-    marginLeft: 8,
   },
-  dangerSection: {
-    marginBottom: 48,
+  chevronDanger: {
+    color: colors.error.base,
   },
-  dangerItem: {
-    backgroundColor: 'rgba(244, 67, 54, 0.1)',
+  divider: {
+    height: 1,
+    backgroundColor: colors.glass.borderLight,
+    marginLeft: 56 + spacing.md,
+  },
+  backupIndicator: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backupIndicatorText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 12,
   },
   modalOverlay: {
     flex: 1,
@@ -432,60 +611,83 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#1E1E1E',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 24,
+    borderTopLeftRadius: radius.xxl,
+    borderTopRightRadius: radius.xxl,
+    padding: spacing.lg,
+    overflow: 'hidden',
   },
   modalTitle: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 24,
+    color: colors.text.primary,
+    fontSize: typography.h2.fontSize,
+    fontWeight: '700',
     textAlign: 'center',
+    marginBottom: spacing.lg,
   },
   networkOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#2A2A2A',
-    borderRadius: 12,
-    marginBottom: 8,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    marginBottom: spacing.sm,
+    overflow: 'hidden',
   },
   networkOptionActive: {
-    backgroundColor: 'rgba(33, 150, 243, 0.2)',
     borderWidth: 1,
-    borderColor: '#2196F3',
+    borderColor: colors.primary.start,
+  },
+  networkIcon: {
+    fontSize: 24,
+    marginRight: spacing.md,
+  },
+  accountIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.glass.light,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
   },
   networkInfo: {
     flex: 1,
   },
   networkName: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '500',
+    color: colors.text.primary,
+    fontSize: typography.body.fontSize,
+    fontWeight: '600',
   },
   networkNameActive: {
-    color: '#2196F3',
+    color: colors.primary.start,
   },
   networkDescription: {
-    color: '#888',
-    fontSize: 12,
+    color: colors.text.tertiary,
+    fontSize: typography.small.fontSize,
     marginTop: 2,
   },
   checkmark: {
-    color: '#2196F3',
-    fontSize: 20,
-    fontWeight: 'bold',
+    overflow: 'hidden',
+    borderRadius: 12,
+  },
+  checkmarkGradient: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkmarkText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
   },
   modalCloseButton: {
-    padding: 16,
+    padding: spacing.md,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   modalCloseText: {
-    color: '#888',
-    fontSize: 16,
+    color: colors.text.tertiary,
+    fontSize: typography.body.fontSize,
+    fontWeight: '500',
   },
 });
 

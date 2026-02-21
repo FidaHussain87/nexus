@@ -1,9 +1,9 @@
 /**
  * SHURIUM Mobile Wallet - Receive Screen
- * Display address and QR code for receiving SHR
+ * Premium glassmorphism design with QR code and animations
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,16 +14,28 @@ import {
   Clipboard,
   Alert,
   ScrollView,
+  Animated,
+  Pressable,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import QRCode from 'react-native-qrcode-svg';
 import { useWalletStore } from '../store/wallet';
 import { createShuriumURI } from '../utils/crypto';
+import { colors, gradients, spacing, radius, shadows, typography } from '../theme';
+import { GlassCard, GlassButton, GlowingIcon } from '../components/ui';
 
 export const ReceiveScreen: React.FC = () => {
   const { accounts, activeAccountId, network } = useWalletStore();
   const [requestAmount, setRequestAmount] = useState('');
   const [label, setLabel] = useState('');
   const [showOptions, setShowOptions] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Animations
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+  const qrScaleAnim = useRef(new Animated.Value(0.9)).current;
+  const copyAnim = useRef(new Animated.Value(0)).current;
 
   const activeAccount = accounts.find(a => a.id === activeAccountId);
   const address = activeAccount?.address || '';
@@ -34,9 +46,48 @@ export const ReceiveScreen: React.FC = () => {
     return createShuriumURI(address, amount, label || undefined);
   }, [address, requestAmount, label]);
 
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        damping: 15,
+        stiffness: 100,
+        useNativeDriver: true,
+      }),
+      Animated.spring(qrScaleAnim, {
+        toValue: 1,
+        damping: 12,
+        stiffness: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const animateCopy = () => {
+    setCopied(true);
+    Animated.sequence([
+      Animated.timing(copyAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.delay(1500),
+      Animated.timing(copyAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => setCopied(false));
+  };
+
   const copyAddress = () => {
     Clipboard.setString(address);
-    Alert.alert('Copied', 'Address copied to clipboard');
+    animateCopy();
   };
 
   const copyURI = () => {
@@ -65,281 +116,447 @@ export const ReceiveScreen: React.FC = () => {
     }
   };
 
+  const networkLabel = getNetworkLabel();
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Network Badge */}
-      {getNetworkLabel() && (
-        <View style={styles.networkBadge}>
-          <Text style={styles.networkText}>{getNetworkLabel()}</Text>
-        </View>
-      )}
-
-      {/* QR Code */}
-      <View style={styles.qrContainer}>
-        <View style={styles.qrWrapper}>
-          <QRCode
-            value={showOptions && (requestAmount || label) ? shuriumURI : address}
-            size={200}
-            backgroundColor="#FFFFFF"
-            color="#000000"
-          />
-        </View>
-        <Text style={styles.qrHint}>
-          Scan this QR code to send SHR
-        </Text>
+    <View style={styles.container}>
+      {/* Animated Background Orbs */}
+      <View style={styles.backgroundOrbs}>
+        <Animated.View style={[styles.orb, styles.orb1, { opacity: fadeAnim }]} />
+        <Animated.View style={[styles.orb, styles.orb2, { opacity: fadeAnim }]} />
       </View>
 
-      {/* Address Display */}
-      <View style={styles.addressContainer}>
-        <Text style={styles.addressLabel}>Your Address</Text>
-        <TouchableOpacity style={styles.addressBox} onPress={copyAddress}>
-          <Text style={styles.addressText} selectable>
-            {address}
-          </Text>
-        </TouchableOpacity>
-        <Text style={styles.tapHint}>Tap to copy</Text>
-      </View>
-
-      {/* Request Amount Toggle */}
-      <TouchableOpacity 
-        style={styles.optionsToggle}
-        onPress={() => setShowOptions(!showOptions)}
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.optionsToggleText}>
-          {showOptions ? '- Hide request options' : '+ Add amount request'}
-        </Text>
-      </TouchableOpacity>
-
-      {/* Request Options */}
-      {showOptions && (
-        <View style={styles.optionsContainer}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Request Amount (optional)</Text>
-            <View style={styles.amountInputRow}>
-              <TextInput
-                style={styles.input}
-                placeholder="0.00000000"
-                placeholderTextColor="#666"
-                value={requestAmount}
-                onChangeText={setRequestAmount}
-                keyboardType="decimal-pad"
-              />
-              <Text style={styles.currencyLabel}>SHR</Text>
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Label (optional)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Payment for..."
-              placeholderTextColor="#666"
-              value={label}
-              onChangeText={setLabel}
-            />
-          </View>
-
-          {(requestAmount || label) && (
-            <View style={styles.uriContainer}>
-              <Text style={styles.uriLabel}>Payment Request URI</Text>
-              <TouchableOpacity style={styles.uriBox} onPress={copyURI}>
-                <Text style={styles.uriText} numberOfLines={2}>
-                  {shuriumURI}
-                </Text>
-              </TouchableOpacity>
+        <Animated.View style={{ 
+          opacity: fadeAnim, 
+          transform: [{ translateY: slideAnim }] 
+        }}>
+          {/* Network Badge */}
+          {networkLabel && (
+            <View style={styles.networkBadgeContainer}>
+              <LinearGradient
+                colors={network === 'testnet' 
+                  ? ['#F59E0B', '#D97706'] 
+                  : ['#A855F7', '#7C3AED']}
+                style={styles.networkBadge}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Text style={styles.networkText}>{networkLabel}</Text>
+              </LinearGradient>
             </View>
           )}
-        </View>
-      )}
 
-      {/* Action Buttons */}
-      <View style={styles.actions}>
-        <TouchableOpacity style={styles.actionButton} onPress={copyAddress}>
-          <Text style={styles.actionIcon}>C</Text>
-          <Text style={styles.actionText}>Copy</Text>
-        </TouchableOpacity>
+          {/* QR Code Card */}
+          <Animated.View style={{ transform: [{ scale: qrScaleAnim }] }}>
+            <GlassCard style={styles.qrCard} intensity="medium" glow glowColor="rgba(139, 92, 246, 0.3)">
+              <LinearGradient
+                colors={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.02)']}
+                style={StyleSheet.absoluteFill}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              />
+              <View style={styles.qrWrapper}>
+                <LinearGradient
+                  colors={['#fff', '#f8f8f8']}
+                  style={styles.qrInner}
+                >
+                  <QRCode
+                    value={showOptions && (requestAmount || label) ? shuriumURI : address}
+                    size={180}
+                    backgroundColor="transparent"
+                    color="#0A0A0F"
+                  />
+                </LinearGradient>
+              </View>
+              <Text style={styles.qrHint}>Scan to send SHR</Text>
+            </GlassCard>
+          </Animated.View>
 
-        <TouchableOpacity style={styles.actionButton} onPress={shareAddress}>
-          <Text style={styles.actionIcon}>S</Text>
-          <Text style={styles.actionText}>Share</Text>
-        </TouchableOpacity>
-      </View>
+          {/* Address Card */}
+          <GlassCard style={styles.addressCard} intensity="light">
+            <Text style={styles.addressLabel}>Your Address</Text>
+            <Pressable 
+              style={styles.addressBox} 
+              onPress={copyAddress}
+            >
+              <Text style={styles.addressText} selectable>
+                {address}
+              </Text>
+              <View style={styles.copyIndicator}>
+                <Animated.View 
+                  style={[
+                    styles.copySuccess,
+                    {
+                      opacity: copyAnim,
+                      transform: [{
+                        scale: copyAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.8, 1],
+                        }),
+                      }],
+                    },
+                  ]}
+                >
+                  <Text style={styles.copySuccessText}>Copied!</Text>
+                </Animated.View>
+              </View>
+            </Pressable>
+            <Text style={styles.tapHint}>Tap to copy</Text>
+          </GlassCard>
 
-      {/* Account Selector (if multiple accounts) */}
-      {accounts.length > 1 && (
-        <View style={styles.accountSelector}>
-          <Text style={styles.accountLabel}>Receiving to:</Text>
-          <Text style={styles.accountName}>{activeAccount?.name || 'Default'}</Text>
-        </View>
-      )}
-    </ScrollView>
+          {/* Request Amount Toggle */}
+          <TouchableOpacity 
+            style={styles.optionsToggle}
+            onPress={() => setShowOptions(!showOptions)}
+          >
+            <LinearGradient
+              colors={showOptions ? gradients.primary : ['transparent', 'transparent']}
+              style={styles.optionsToggleInner}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Text style={[
+                styles.optionsToggleText,
+                showOptions && styles.optionsToggleTextActive
+              ]}>
+                {showOptions ? '− Hide request options' : '+ Add amount request'}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Request Options */}
+          {showOptions && (
+            <Animated.View>
+              <GlassCard style={styles.optionsContainer} intensity="light">
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Request Amount (optional)</Text>
+                  <View style={styles.amountInputRow}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="0.00000000"
+                      placeholderTextColor={colors.text.muted}
+                      value={requestAmount}
+                      onChangeText={setRequestAmount}
+                      keyboardType="decimal-pad"
+                    />
+                    <View style={styles.currencyBadge}>
+                      <Text style={styles.currencyLabel}>SHR</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Label (optional)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Payment for..."
+                    placeholderTextColor={colors.text.muted}
+                    value={label}
+                    onChangeText={setLabel}
+                  />
+                </View>
+
+                {(requestAmount || label) && (
+                  <View style={styles.uriContainer}>
+                    <Text style={styles.uriLabel}>Payment Request URI</Text>
+                    <Pressable style={styles.uriBox} onPress={copyURI}>
+                      <Text style={styles.uriText} numberOfLines={2}>
+                        {shuriumURI}
+                      </Text>
+                    </Pressable>
+                  </View>
+                )}
+              </GlassCard>
+            </Animated.View>
+          )}
+
+          {/* Action Buttons */}
+          <View style={styles.actions}>
+            <Pressable style={styles.actionButton} onPress={copyAddress}>
+              <LinearGradient
+                colors={gradients.primary}
+                style={styles.actionButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Text style={styles.actionIcon}>📋</Text>
+              </LinearGradient>
+              <Text style={styles.actionText}>Copy</Text>
+            </Pressable>
+
+            <Pressable style={styles.actionButton} onPress={shareAddress}>
+              <LinearGradient
+                colors={['#06B6D4', '#0891B2']}
+                style={styles.actionButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Text style={styles.actionIcon}>↗</Text>
+              </LinearGradient>
+              <Text style={styles.actionText}>Share</Text>
+            </Pressable>
+          </View>
+
+          {/* Account Selector (if multiple accounts) */}
+          {accounts.length > 1 && (
+            <GlassCard style={styles.accountSelector} intensity="light">
+              <Text style={styles.accountLabel}>Receiving to:</Text>
+              <View style={styles.accountBadge}>
+                <Text style={styles.accountName}>{activeAccount?.name || 'Default'}</Text>
+              </View>
+            </GlassCard>
+          )}
+        </Animated.View>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: colors.background.primary,
+  },
+  backgroundOrbs: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+  },
+  orb: {
+    position: 'absolute',
+    borderRadius: 9999,
+  },
+  orb1: {
+    width: 300,
+    height: 300,
+    top: -50,
+    left: -100,
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+  },
+  orb2: {
+    width: 200,
+    height: 200,
+    bottom: 50,
+    right: -50,
+    backgroundColor: 'rgba(6, 182, 212, 0.08)',
+  },
+  scrollView: {
+    flex: 1,
   },
   content: {
-    padding: 16,
+    padding: spacing.md,
     alignItems: 'center',
   },
+  networkBadgeContainer: {
+    marginBottom: spacing.md,
+  },
   networkBadge: {
-    backgroundColor: '#FF9800',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginBottom: 16,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
   },
   networkText: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    letterSpacing: 1,
   },
-  qrContainer: {
+  qrCard: {
+    padding: spacing.lg,
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: spacing.lg,
   },
   qrWrapper: {
-    padding: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    padding: 4,
+    borderRadius: radius.lg,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginBottom: spacing.md,
+  },
+  qrInner: {
+    padding: spacing.md,
+    borderRadius: radius.md,
   },
   qrHint: {
-    color: '#888',
-    fontSize: 14,
-    marginTop: 12,
+    color: colors.text.secondary,
+    fontSize: typography.caption.fontSize,
   },
-  addressContainer: {
+  addressCard: {
     width: '100%',
-    marginBottom: 16,
+    padding: spacing.md,
+    marginBottom: spacing.md,
   },
   addressLabel: {
-    color: '#888',
-    fontSize: 14,
-    marginBottom: 8,
+    color: colors.text.secondary,
+    fontSize: typography.caption.fontSize,
+    marginBottom: spacing.sm,
   },
   addressBox: {
-    backgroundColor: '#1E1E1E',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: colors.glass.light,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    position: 'relative',
   },
   addressText: {
-    color: '#fff',
-    fontSize: 14,
+    color: colors.text.primary,
+    fontSize: 13,
     fontFamily: 'monospace',
     textAlign: 'center',
+    lineHeight: 20,
+  },
+  copyIndicator: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  copySuccess: {
+    backgroundColor: colors.success.base,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+  },
+  copySuccessText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
   },
   tapHint: {
-    color: '#666',
-    fontSize: 12,
+    color: colors.text.muted,
+    fontSize: typography.small.fontSize,
     textAlign: 'center',
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
   optionsToggle: {
-    marginVertical: 16,
+    marginVertical: spacing.md,
+    overflow: 'hidden',
+    borderRadius: radius.full,
+  },
+  optionsToggleInner: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.glass.border,
+    borderRadius: radius.full,
   },
   optionsToggleText: {
-    color: '#2196F3',
-    fontSize: 14,
+    color: colors.primary.start,
+    fontSize: typography.caption.fontSize,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  optionsToggleTextActive: {
+    color: '#fff',
   },
   optionsContainer: {
     width: '100%',
-    backgroundColor: '#1E1E1E',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    padding: spacing.md,
+    marginBottom: spacing.md,
   },
   inputGroup: {
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   inputLabel: {
-    color: '#888',
-    fontSize: 14,
-    marginBottom: 8,
+    color: colors.text.secondary,
+    fontSize: typography.small.fontSize,
+    marginBottom: spacing.xs,
   },
   input: {
-    backgroundColor: '#2A2A2A',
-    borderRadius: 8,
-    padding: 12,
-    color: '#fff',
-    fontSize: 16,
+    backgroundColor: colors.glass.light,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    color: colors.text.primary,
+    fontSize: typography.body.fontSize,
     flex: 1,
   },
   amountInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2A2A2A',
-    borderRadius: 8,
+    backgroundColor: colors.glass.light,
+    borderRadius: radius.md,
+  },
+  currencyBadge: {
+    paddingHorizontal: spacing.md,
   },
   currencyLabel: {
-    color: '#888',
-    fontSize: 16,
-    paddingRight: 12,
+    color: colors.text.secondary,
+    fontSize: typography.caption.fontSize,
+    fontWeight: '600',
   },
   uriContainer: {
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   uriLabel: {
-    color: '#888',
-    fontSize: 12,
-    marginBottom: 4,
+    color: colors.text.tertiary,
+    fontSize: typography.small.fontSize,
+    marginBottom: spacing.xs,
   },
   uriBox: {
-    backgroundColor: '#2A2A2A',
-    padding: 12,
-    borderRadius: 8,
+    backgroundColor: colors.glass.light,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.success.base,
   },
   uriText: {
-    color: '#4CAF50',
+    color: colors.success.base,
     fontSize: 12,
     fontFamily: 'monospace',
   },
   actions: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 24,
-    marginVertical: 24,
+    gap: spacing.xl,
+    marginVertical: spacing.lg,
   },
   actionButton: {
     alignItems: 'center',
-    padding: 16,
+  },
+  actionButtonGradient: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    ...shadows.button,
   },
   actionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#2196F3',
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    lineHeight: 48,
-    marginBottom: 8,
-    overflow: 'hidden',
+    fontSize: 24,
   },
   actionText: {
-    color: '#fff',
-    fontSize: 14,
+    color: colors.text.primary,
+    fontSize: typography.caption.fontSize,
+    fontWeight: '500',
   },
   accountSelector: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1E1E1E',
-    padding: 12,
-    borderRadius: 8,
-    width: '100%',
+    justifyContent: 'space-between',
+    padding: spacing.md,
   },
   accountLabel: {
-    color: '#888',
-    fontSize: 14,
-    marginRight: 8,
+    color: colors.text.secondary,
+    fontSize: typography.caption.fontSize,
+  },
+  accountBadge: {
+    backgroundColor: colors.glass.light,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.sm,
   },
   accountName: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
+    color: colors.text.primary,
+    fontSize: typography.caption.fontSize,
+    fontWeight: '600',
   },
 });
 

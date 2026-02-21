@@ -261,18 +261,20 @@ TEST_F(RewardTest, CoinbaseBuilderBuildCoinbase) {
     CoinbaseBuilder builder(*calculator_);
     
     // Create test addresses
-    std::array<Byte, 20> minerData{}, ubiData{}, ecoData{}, stabData{};
+    std::array<Byte, 20> minerData{}, ubiData{}, contribData{}, ecoData{}, stabData{};
     std::fill(minerData.begin(), minerData.end(), 0x01);
     std::fill(ubiData.begin(), ubiData.end(), 0x02);
+    std::fill(contribData.begin(), contribData.end(), 0x05);
     std::fill(ecoData.begin(), ecoData.end(), 0x03);
     std::fill(stabData.begin(), stabData.end(), 0x04);
     
     Hash160 miner(minerData);
     Hash160 ubi(ubiData);
+    Hash160 contrib(contribData);
     Hash160 eco(ecoData);
     Hash160 stab(stabData);
     
-    auto outputs = builder.BuildCoinbase(0, miner, ubi, eco, stab);
+    auto outputs = builder.BuildCoinbase(0, miner, ubi, contrib, eco, stab);
     
     // Should have outputs for work, ubi, contributions, ecosystem, stability
     EXPECT_GE(outputs.size(), 4);
@@ -289,18 +291,20 @@ TEST_F(RewardTest, CoinbaseBuilderVerifyCoinbase) {
     CoinbaseBuilder builder(*calculator_);
     
     // Create test addresses using std::array
-    std::array<Byte, 20> minerData{}, ubiData{}, ecoData{}, stabData{};
+    std::array<Byte, 20> minerData{}, ubiData{}, contribData{}, ecoData{}, stabData{};
     std::fill(minerData.begin(), minerData.end(), 0x01);
     std::fill(ubiData.begin(), ubiData.end(), 0x02);
+    std::fill(contribData.begin(), contribData.end(), 0x05);
     std::fill(ecoData.begin(), ecoData.end(), 0x03);
     std::fill(stabData.begin(), stabData.end(), 0x04);
     
     Hash160 miner(minerData);
     Hash160 ubi(ubiData);
+    Hash160 contrib(contribData);
     Hash160 eco(ecoData);
     Hash160 stab(stabData);
     
-    auto outputs = builder.BuildCoinbase(0, miner, ubi, eco, stab);
+    auto outputs = builder.BuildCoinbase(0, miner, ubi, contrib, eco, stab);
     
     EXPECT_TRUE(builder.VerifyCoinbase(0, outputs));
 }
@@ -320,15 +324,15 @@ TEST_F(RewardTest, CoinbaseBuilderVerifyCoinbaseInvalid) {
 // ============================================================================
 
 TEST_F(RewardTest, FormatAmount) {
-    EXPECT_EQ(FormatAmount(1 * COIN), "1.00000000 NXS");
-    EXPECT_EQ(FormatAmount(0), "0.00000000 NXS");
-    EXPECT_EQ(FormatAmount(INITIAL_BLOCK_REWARD), "500.00000000 NXS");
+    EXPECT_EQ(FormatAmount(1 * COIN), "1.00000000 SHR");
+    EXPECT_EQ(FormatAmount(0), "0.00000000 SHR");
+    EXPECT_EQ(FormatAmount(INITIAL_BLOCK_REWARD), "500.00000000 SHR");
 }
 
 TEST_F(RewardTest, ParseAmount) {
-    EXPECT_EQ(ParseAmount("1 NXS"), 1 * COIN);
-    EXPECT_EQ(ParseAmount("500 NXS"), 500 * COIN);
-    EXPECT_EQ(ParseAmount("1.5 NXS"), 150000000);
+    EXPECT_EQ(ParseAmount("1 SHR"), 1 * COIN);
+    EXPECT_EQ(ParseAmount("500 SHR"), 500 * COIN);
+    EXPECT_EQ(ParseAmount("1.5 SHR"), 150000000);
     EXPECT_EQ(ParseAmount("0.00000001"), 1);
 }
 

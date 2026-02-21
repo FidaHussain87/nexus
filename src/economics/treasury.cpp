@@ -670,8 +670,20 @@ std::optional<ProposalId> Treasury::SubmitProposal(
     proposal.executionHeight = proposal.votingEndHeight + PROPOSAL_EXECUTION_DELAY;
     
     // Calculate total voting power at this snapshot
-    // In production, this would query stake distribution
-    proposal.totalVotingPower = 1000000; // Placeholder
+    // Use the total voting power calculator if set, otherwise use a default
+    // based on the treasury balance (as a proxy for network value)
+    if (totalVotingPowerCalculator_) {
+        proposal.totalVotingPower = totalVotingPowerCalculator_();
+    } else {
+        // Default: use treasury balance as a proxy for total stake
+        // This ensures voting thresholds are proportional to network activity
+        proposal.totalVotingPower = static_cast<uint64_t>(balance_);
+    }
+    
+    // Ensure minimum total voting power to avoid division by zero
+    if (proposal.totalVotingPower == 0) {
+        proposal.totalVotingPower = MIN_PROPOSAL_AMOUNT;
+    }
     
     proposals_[proposal.id] = proposal;
     
@@ -815,6 +827,11 @@ void Treasury::SetVotingPowerCalculator(VotingPowerCalculator calculator) {
     votingPowerCalculator_ = std::move(calculator);
 }
 
+void Treasury::SetTotalVotingPowerCalculator(TotalVotingPowerCalculator calculator) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    totalVotingPowerCalculator_ = std::move(calculator);
+}
+
 void Treasury::ProcessBlock(int height) {
     std::lock_guard<std::mutex> lock(mutex_);
     
@@ -953,15 +970,97 @@ std::vector<Byte> Treasury::Serialize() const {
     std::lock_guard<std::mutex> lock(mutex_);
     
     std::vector<Byte> data;
-    // Simplified serialization
+    
+    // Version byte for future compatibility
+    data.push_back(0x01);
+    
+    // Serialize balance (8 bytes, little-endian)
+    for (int i = 0; i < 8; ++i) {
+        data.push_back(static_cast<Byte>((balance_ >> (i * 8)) & 0xFF));
+    }
+    
+    // Serialize category balances
+    uint32_t numCategories = static_cast<uint32_t>(categoryBalances_.size());
+    for (int i = 0; i < 4; ++i) {
+        data.push_back(static_cast<Byte>((numCategories >> (i * 8)) & 0xFF));
+    }
+    
+    for (const auto& [category, amount] : categoryBalances_) {
+        // Category as uint8_t
+        data.push_back(static_cast<Byte>(category));
+        // Amount as 8 bytes
+        for (int i = 0; i < 8; ++i) {
+            data.push_back(static_cast<Byte>((amount >> (i * 8)) & 0xFF));
+        }
+    }
+    
+    // Serialize proposal count (for state tracking, actual proposals stored separately)
+    uint32_t numProposals = static_cast<uint32_t>(proposals_.size());
+    for (int i = 0; i < 4; ++i) {
+        data.push_back(static_cast<Byte>((numProposals >> (i * 8)) & 0xFF));
+    }
+    
+    // Note: Full proposal serialization would include all proposal data
+    // For production, each proposal would be serialized with its full state
+    
     return data;
 }
 
 bool Treasury::Deserialize(const Byte* data, size_t len) {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    (void)data;
-    (void)len;
+    if (!data || len < 13) {  // Minimum: version(1) + balance(8) + numCategories(4)
+        return false;
+    }
+    
+    size_t offset = 0;
+    
+    // Check version
+    Byte version = data[offset++];
+    if (version != 0x01) {
+        return false;  // Unsupported version
+    }
+    
+    // Deserialize balance
+    balance_ = 0;
+    for (int i = 0; i < 8; ++i) {
+        balance_ |= static_cast<Amount>(data[offset++]) << (i * 8);
+    }
+    
+    // Deserialize category balances
+    uint32_t numCategories = 0;
+    for (int i = 0; i < 4; ++i) {
+        numCategories |= static_cast<uint32_t>(data[offset++]) << (i * 8);
+    }
+    
+    // Validate we have enough data
+    if (len < offset + numCategories * 9) {
+        return false;
+    }
+    
+    categoryBalances_.clear();
+    for (uint32_t c = 0; c < numCategories; ++c) {
+        TreasuryCategory category = static_cast<TreasuryCategory>(data[offset++]);
+        Amount amount = 0;
+        for (int i = 0; i < 8; ++i) {
+            amount |= static_cast<Amount>(data[offset++]) << (i * 8);
+        }
+        categoryBalances_[category] = amount;
+    }
+    
+    // Deserialize proposal count
+    if (offset + 4 > len) {
+        return false;
+    }
+    uint32_t numProposals = 0;
+    for (int i = 0; i < 4; ++i) {
+        numProposals |= static_cast<uint32_t>(data[offset++]) << (i * 8);
+    }
+    
+    // Note: Full proposal deserialization would restore all proposals
+    // For now, we just validate the format is correct
+    (void)numProposals;
+    
     return true;
 }
 
@@ -1074,7 +1173,7 @@ std::pair<std::vector<Byte>, Amount> TreasuryOutputBuilder::BuildRefundOutput(
 // ============================================================================
 
 Amount CalculateProposalDeposit(Amount proposalAmount) {
-    // Deposit is 1% of proposal amount, minimum 100 NXS
+    // Deposit is 1% of proposal amount, minimum 100 SHR
     Amount deposit = proposalAmount / 100;
     return std::max(deposit, 100 * COIN);
 }
@@ -1104,7 +1203,7 @@ bool ValidateProposal(const TreasuryProposal& proposal, Amount treasuryBalance) 
 }
 
 uint64_t CalculateVotingPower(Amount stake) {
-    // 1 voting power per 1000 NXS stake
+    // 1 voting power per 1000 SHR stake
     return stake / (1000 * COIN);
 }
 

@@ -1343,6 +1343,25 @@ int AppMain(int argc, char* argv[]) {
                 if (g_ubiDistributor && g_rewardCalculator) {
                     Amount ubiAmount = g_rewardCalculator->GetUBIPoolAmount(height);
                     g_ubiDistributor->AddBlockReward(height, ubiAmount);
+                    
+                    // Check if this block ends an epoch and finalize it
+                    // An epoch ends when (height + 1) % EPOCH_BLOCKS == 0
+                    if (economics::IsEpochEnd(height)) {
+                        economics::EpochId completedEpoch = economics::HeightToEpoch(height);
+                        
+                        // Get actual identity count from the identity manager
+                        uint32_t identityCount = 0;
+                        if (g_identityManager) {
+                            identityCount = static_cast<uint32_t>(g_identityManager->GetIdentityCount());
+                        }
+                        
+                        // Finalize the epoch with the real identity count
+                        g_ubiDistributor->FinalizeEpoch(completedEpoch, identityCount);
+                        
+                        LOG_DEBUG(util::LogCategory::DEFAULT) 
+                            << "UBI epoch " << completedEpoch << " finalized with " 
+                            << identityCount << " eligible identities";
+                    }
                 }
                 
                 // Process governance proposals (advance state, execute approved)

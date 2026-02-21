@@ -237,7 +237,7 @@ public:
     /// Create an unsigned spending transaction from a fund
     /// Returns the transaction and required signatures
     struct UnsignedFundTx {
-        Transaction tx;
+        MutableTransaction tx;
         std::vector<Hash256> sigHashes;  // Hashes to sign for each input
         Script redeemScript;
     };
@@ -250,15 +250,48 @@ public:
     
     /// Add a signature to a fund spending transaction
     bool AddSignature(
-        Transaction& tx,
+        MutableTransaction& tx,
         size_t inputIndex,
         const PublicKey& pubkey,
         const std::vector<uint8_t>& signature
     ) const;
     
+    // ========================================================================
+    // UTXO Tracking (for balance calculations)
+    // ========================================================================
+    
+    /// Track a new UTXO received by a fund
+    void TrackFundUTXO(FundType type, const OutPoint& outpoint, Amount value, int64_t height);
+    
+    /// Mark a fund UTXO as spent
+    void MarkFundUTXOSpent(FundType type, const OutPoint& outpoint, int64_t height);
+    
+    /// Clear all tracked UTXOs (for chain reorg)
+    void ClearTrackedUTXOs();
+    
+    /// Get all unspent UTXOs for a fund
+    std::vector<std::pair<OutPoint, Amount>> GetFundUTXOs(FundType type) const;
+    
 private:
     std::vector<FundConfig> m_funds;
     std::map<Hash160, FundType> m_addressToFund;
+    
+    // UTXO tracking for fund balance calculations
+    struct FundUTXO {
+        Amount value;
+        int64_t height;
+        bool spent;
+    };
+    std::map<FundType, std::map<OutPoint, FundUTXO>> m_fundUTXOs;
+    
+    // Historical tracking
+    std::map<FundType, Amount> m_totalReceived;
+    std::map<FundType, Amount> m_totalSpent;
+    std::map<FundType, int64_t> m_lastActivityHeight;
+    std::map<FundType, size_t> m_transactionCount;
+    
+    // Pending key rotations
+    std::map<FundType, std::array<FundKeyInfo, FUND_MULTISIG_TOTAL>> m_pendingKeyRotations;
     
     /// Generate deterministic keys for a fund (for initial setup)
     static std::array<FundKeyInfo, FUND_MULTISIG_TOTAL> GenerateInitialKeys(

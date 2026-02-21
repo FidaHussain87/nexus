@@ -178,15 +178,31 @@ bool CheckTransaction(const Transaction& tx, ValidationState& state) {
 // Contextual Validation
 // ============================================================================
 
-bool CheckBlockTime(const Block& block, int64_t nPrevBlockTime, ValidationState& state) {
-    // Block timestamp must be greater than previous block
-    if (static_cast<int64_t>(block.nTime) <= nPrevBlockTime) {
+bool CheckBlockTime(const Block& block, int64_t nPrevBlockTime, int64_t nAdjustedTime, ValidationState& state) {
+    int64_t blockTime = static_cast<int64_t>(block.nTime);
+    
+    // Block timestamp must be greater than previous block (median time past in full impl)
+    if (blockTime <= nPrevBlockTime) {
         return state.Invalid("time-too-old", "block timestamp too old");
     }
     
-    // Block timestamp should not be too far in the future
-    // (This would typically compare against adjusted network time)
-    // For now, just ensure it's reasonable
+    // Block timestamp must not be too far in the future
+    // This prevents miners from setting timestamps in the far future to manipulate difficulty
+    // Standard limit is 2 hours (MAX_FUTURE_BLOCK_TIME = 7200 seconds)
+    if (nAdjustedTime > 0) {
+        if (blockTime > nAdjustedTime + MAX_FUTURE_BLOCK_TIME) {
+            return state.Invalid("time-too-new", 
+                "block timestamp too far in the future (limit: 2 hours ahead of network time)");
+        }
+    }
+    
+    // Additional sanity check: block time must be after 2024-01-01 (Unix timestamp 1704067200)
+    // This prevents blocks with unreasonably old timestamps from being accepted
+    constexpr int64_t SHURIUM_GENESIS_TIME = 1704067200;  // 2024-01-01 00:00:00 UTC
+    if (blockTime < SHURIUM_GENESIS_TIME) {
+        return state.Invalid("time-too-old-absolute", 
+            "block timestamp before SHURIUM network start");
+    }
     
     return true;
 }

@@ -1,10 +1,10 @@
 /**
  * SHURIUM Mobile Wallet - UBI Screen
- * Universal Basic Income - Identity status, claims, and history
- * This is SHURIUM's flagship feature for financial inclusion
+ * Premium glassmorphism design for Universal Basic Income
+ * SHURIUM's flagship feature for financial inclusion
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,18 +12,52 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
   RefreshControl,
+  Animated,
+  Pressable,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { useWalletStore } from '../store/wallet';
+import { colors, gradients, spacing, radius, shadows, typography } from '../theme';
+import { GlassCard, GradientButton, PulsingDot, StatusPill, AnimatedBalance, ProgressRing } from '../components/ui';
 
 // Verification level colors and descriptions
 const VERIFICATION_LEVELS = {
-  none: { color: '#666', label: 'Not Verified', description: 'Register your identity to claim UBI' },
-  basic: { color: '#FF9800', label: 'Basic', description: 'Limited UBI eligibility' },
-  standard: { color: '#2196F3', label: 'Standard', description: 'Standard UBI rate' },
-  enhanced: { color: '#4CAF50', label: 'Enhanced', description: 'Enhanced UBI rate' },
-  maximum: { color: '#9C27B0', label: 'Maximum', description: 'Maximum UBI rate' },
+  none: { 
+    color: colors.text.muted, 
+    gradient: ['#6B7280', '#4B5563'],
+    label: 'Not Verified', 
+    description: 'Register your identity to claim UBI',
+    icon: '🔒',
+  },
+  basic: { 
+    color: '#F59E0B', 
+    gradient: ['#F59E0B', '#D97706'],
+    label: 'Basic', 
+    description: 'Limited UBI eligibility',
+    icon: '🥉',
+  },
+  standard: { 
+    color: '#3B82F6', 
+    gradient: ['#3B82F6', '#2563EB'],
+    label: 'Standard', 
+    description: 'Standard UBI rate',
+    icon: '🥈',
+  },
+  enhanced: { 
+    color: '#10B981', 
+    gradient: ['#10B981', '#059669'],
+    label: 'Enhanced', 
+    description: 'Enhanced UBI rate',
+    icon: '🥇',
+  },
+  maximum: { 
+    color: '#A855F7', 
+    gradient: ['#A855F7', '#7C3AED'],
+    label: 'Maximum', 
+    description: 'Maximum UBI rate',
+    icon: '👑',
+  },
 };
 
 export const UBIScreen: React.FC = () => {
@@ -40,10 +74,45 @@ export const UBIScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
 
+  // Animations
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
   const activeAccount = accounts.find(a => a.id === activeAccountId);
 
   useEffect(() => {
     refreshUBIInfo();
+    
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        damping: 15,
+        stiffness: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Pulsing animation for claim button
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.02,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
   }, []);
 
   const onRefresh = useCallback(async () => {
@@ -112,532 +181,729 @@ export const UBIScreen: React.FC = () => {
     
     if (hours > 24) {
       const days = Math.floor(hours / 24);
-      return `${days} day${days > 1 ? 's' : ''} ${hours % 24}h`;
+      return `${days}d ${hours % 24}h`;
     }
     return `${hours}h ${minutes}m`;
   };
 
   const verificationLevel = getVerificationLevel();
+  const claimableAmount = parseFloat(ubiInfo?.claimableAmount || '0');
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
-      {/* Error Banner */}
-      {lastError && (
-        <TouchableOpacity style={styles.errorBanner} onPress={clearError}>
-          <Text style={styles.errorText}>{lastError}</Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Header Card - What is UBI */}
-      <View style={styles.headerCard}>
-        <Text style={styles.headerTitle}>Universal Basic Income</Text>
-        <Text style={styles.headerDescription}>
-          SHURIUM provides regular income to all verified participants, 
-          funded by network emissions and treasury. No conditions, 
-          no means testing - just financial inclusion for everyone.
-        </Text>
+    <View style={styles.container}>
+      {/* Animated Background */}
+      <View style={styles.backgroundOrbs}>
+        <Animated.View style={[styles.orb, styles.orb1, { opacity: fadeAnim }]} />
+        <Animated.View style={[styles.orb, styles.orb2, { opacity: fadeAnim }]} />
+        <Animated.View style={[styles.orb, styles.orb3, { opacity: fadeAnim }]} />
       </View>
 
-      {/* Identity Status */}
-      <View style={styles.identityCard}>
-        <Text style={styles.sectionTitle}>Identity Status</Text>
-        
-        <View style={styles.identityStatus}>
-          <View style={[styles.verificationBadge, { backgroundColor: verificationLevel.color }]}>
-            <Text style={styles.verificationText}>{verificationLevel.label}</Text>
-          </View>
-          <Text style={styles.verificationDescription}>{verificationLevel.description}</Text>
-        </View>
-
-        {ubiInfo?.identityId ? (
-          <View style={styles.identityDetails}>
-            <View style={styles.identityRow}>
-              <Text style={styles.identityLabel}>Identity ID</Text>
-              <Text style={styles.identityValue} numberOfLines={1}>
-                {ubiInfo.identityId}
-              </Text>
-            </View>
-            <View style={styles.identityRow}>
-              <Text style={styles.identityLabel}>Registered</Text>
-              <Text style={[styles.identityValue, { color: '#4CAF50' }]}>Yes</Text>
-            </View>
-            <View style={styles.identityRow}>
-              <Text style={styles.identityLabel}>UBI Eligible</Text>
-              <Text style={[styles.identityValue, { 
-                color: ubiInfo.isEligible ? '#4CAF50' : '#F44336' 
-              }]}>
-                {ubiInfo.isEligible ? 'Yes' : 'No'}
-              </Text>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.notRegistered}>
-            <Text style={styles.notRegisteredText}>
-              Your identity is not yet registered on the SHURIUM network.
-            </Text>
-            <TouchableOpacity style={styles.registerButton}>
-              <Text style={styles.registerButtonText}>Register Identity</Text>
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            tintColor={colors.primary.start}
+          />
+        }
+      >
+        <Animated.View style={{ 
+          opacity: fadeAnim, 
+          transform: [{ translateY: slideAnim }] 
+        }}>
+          {/* Error Banner */}
+          {lastError && (
+            <TouchableOpacity style={styles.errorBanner} onPress={clearError}>
+              <LinearGradient
+                colors={['#EF4444', '#DC2626']}
+                style={StyleSheet.absoluteFill}
+              />
+              <Text style={styles.errorText}>{lastError}</Text>
             </TouchableOpacity>
-            <Text style={styles.registerHint}>
-              Identity registration requires zero-knowledge proof of uniqueness
-            </Text>
-          </View>
-        )}
-      </View>
+          )}
 
-      {/* Claim UBI */}
-      {ubiInfo?.isEligible && (
-        <View style={styles.claimCard}>
-          <Text style={styles.sectionTitle}>Claim Your UBI</Text>
-          
-          <View style={styles.claimAmount}>
-            <Text style={styles.claimAmountLabel}>Available to Claim</Text>
-            <Text style={styles.claimAmountValue}>
-              {ubiInfo.claimableAmount || '0'} SHR
+          {/* Hero Header Card */}
+          <GlassCard style={styles.heroCard} intensity="heavy" glow glowColor="rgba(168, 85, 247, 0.4)">
+            <LinearGradient
+              colors={['rgba(168, 85, 247, 0.3)', 'rgba(139, 92, 246, 0.2)', 'rgba(59, 130, 246, 0.1)']}
+              style={StyleSheet.absoluteFill}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            />
+            <Text style={styles.heroIcon}>🌍</Text>
+            <Text style={styles.heroTitle}>Universal Basic Income</Text>
+            <Text style={styles.heroDescription}>
+              Financial inclusion for everyone. Funded by network emissions, 
+              distributed fairly to all verified participants.
             </Text>
-          </View>
+          </GlassCard>
 
-          <TouchableOpacity
-            style={[
-              styles.claimButton,
-              (parseFloat(ubiInfo.claimableAmount) <= 0 || isClaiming) && styles.claimButtonDisabled
-            ]}
-            onPress={handleClaimUBI}
-            disabled={parseFloat(ubiInfo.claimableAmount) <= 0 || isClaiming}
-          >
-            {isClaiming ? (
-              <ActivityIndicator color="#fff" />
+          {/* Identity Status Card */}
+          <GlassCard style={styles.identityCard} intensity="medium">
+            <View style={styles.identityHeader}>
+              <Text style={styles.sectionTitle}>Identity Status</Text>
+              <LinearGradient
+                colors={verificationLevel.gradient}
+                style={styles.verificationBadge}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Text style={styles.verificationIcon}>{verificationLevel.icon}</Text>
+                <Text style={styles.verificationText}>{verificationLevel.label}</Text>
+              </LinearGradient>
+            </View>
+            
+            <Text style={styles.verificationDescription}>{verificationLevel.description}</Text>
+
+            {ubiInfo?.identityId ? (
+              <View style={styles.identityDetails}>
+                <View style={styles.identityRow}>
+                  <Text style={styles.identityLabel}>Identity ID</Text>
+                  <Text style={styles.identityValue} numberOfLines={1}>
+                    {ubiInfo.identityId.substring(0, 20)}...
+                  </Text>
+                </View>
+                <View style={styles.identityRow}>
+                  <Text style={styles.identityLabel}>Registered</Text>
+                  <View style={styles.statusIndicator}>
+                    <View style={[styles.statusDot, { backgroundColor: colors.success.base }]} />
+                    <Text style={[styles.identityValue, { color: colors.success.base }]}>Yes</Text>
+                  </View>
+                </View>
+                <View style={styles.identityRow}>
+                  <Text style={styles.identityLabel}>UBI Eligible</Text>
+                  <View style={styles.statusIndicator}>
+                    <View style={[
+                      styles.statusDot, 
+                      { backgroundColor: ubiInfo.isEligible ? colors.success.base : colors.error.base }
+                    ]} />
+                    <Text style={[
+                      styles.identityValue, 
+                      { color: ubiInfo.isEligible ? colors.success.base : colors.error.base }
+                    ]}>
+                      {ubiInfo.isEligible ? 'Yes' : 'No'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
             ) : (
-              <Text style={styles.claimButtonText}>
-                {parseFloat(ubiInfo.claimableAmount) > 0 
-                  ? `Claim ${ubiInfo.claimableAmount} SHR`
-                  : 'No UBI Available'}
-              </Text>
-            )}
-          </TouchableOpacity>
-
-          {/* Claim timing info */}
-          <View style={styles.claimTiming}>
-            <View style={styles.timingRow}>
-              <Text style={styles.timingLabel}>Last Claim</Text>
-              <Text style={styles.timingValue}>{formatDate(ubiInfo.lastClaimTime)}</Text>
-            </View>
-            <View style={styles.timingRow}>
-              <Text style={styles.timingLabel}>Next Claim</Text>
-              <Text style={styles.timingValue}>
-                {getTimeUntilNextClaim() || 'Register identity'}
-              </Text>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {/* Statistics */}
-      <View style={styles.statsCard}>
-        <Text style={styles.sectionTitle}>Your UBI Statistics</Text>
-        
-        <View style={styles.statsGrid}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{ubiInfo?.totalClaimed || '0'}</Text>
-            <Text style={styles.statLabel}>Total Claimed (SHR)</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>
-              {ubiInfo?.claimHistory?.length || 0}
-            </Text>
-            <Text style={styles.statLabel}>Claims Made</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Claim History */}
-      {ubiInfo?.claimHistory && ubiInfo.claimHistory.length > 0 && (
-        <View style={styles.historyCard}>
-          <Text style={styles.sectionTitle}>Claim History</Text>
-          
-          {ubiInfo.claimHistory.map((claim, index) => (
-            <View key={index} style={styles.historyItem}>
-              <View style={styles.historyInfo}>
-                <Text style={styles.historyAmount}>+{claim.amount} SHR</Text>
-                <Text style={styles.historyDate}>
-                  {new Date(claim.timestamp * 1000).toLocaleDateString()}
+              <View style={styles.notRegistered}>
+                <Text style={styles.notRegisteredText}>
+                  Your identity is not yet registered on the SHURIUM network.
+                </Text>
+                <Pressable>
+                  <LinearGradient
+                    colors={['#A855F7', '#7C3AED']}
+                    style={styles.registerButton}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  >
+                    <Text style={styles.registerIcon}>🔐</Text>
+                    <Text style={styles.registerButtonText}>Register Identity</Text>
+                  </LinearGradient>
+                </Pressable>
+                <Text style={styles.registerHint}>
+                  Uses zero-knowledge proof for privacy-preserving verification
                 </Text>
               </View>
-              <Text style={styles.historyTxid} numberOfLines={1}>
-                {claim.txid.substring(0, 12)}...
-              </Text>
+            )}
+          </GlassCard>
+
+          {/* Claim UBI Card */}
+          {ubiInfo?.isEligible && (
+            <Animated.View style={{ transform: [{ scale: claimableAmount > 0 ? pulseAnim : 1 }] }}>
+              <GlassCard 
+                style={styles.claimCard} 
+                intensity="medium" 
+                glow={claimableAmount > 0}
+                glowColor="rgba(16, 185, 129, 0.4)"
+              >
+                <LinearGradient
+                  colors={claimableAmount > 0 
+                    ? ['rgba(16, 185, 129, 0.15)', 'rgba(16, 185, 129, 0.05)']
+                    : ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']}
+                  style={StyleSheet.absoluteFill}
+                />
+                <Text style={styles.sectionTitle}>Claim Your UBI</Text>
+                
+                <View style={styles.claimAmountContainer}>
+                  <Text style={styles.claimAmountLabel}>Available to Claim</Text>
+                  <View style={styles.claimAmountRow}>
+                    <AnimatedBalance 
+                      value={claimableAmount}
+                      decimals={4}
+                      suffix=""
+                      style={styles.claimAmountValue}
+                    />
+                    <Text style={styles.claimAmountCurrency}>SHR</Text>
+                  </View>
+                </View>
+
+                <Pressable
+                  onPress={handleClaimUBI}
+                  disabled={claimableAmount <= 0 || isClaiming}
+                >
+                  <LinearGradient
+                    colors={claimableAmount > 0 ? gradients.success : ['#444', '#333']}
+                    style={[
+                      styles.claimButton,
+                      (claimableAmount <= 0 || isClaiming) && styles.claimButtonDisabled
+                    ]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  >
+                    {isClaiming ? (
+                      <PulsingDot />
+                    ) : (
+                      <>
+                        <Text style={styles.claimButtonIcon}>🎁</Text>
+                        <Text style={styles.claimButtonText}>
+                          {claimableAmount > 0 
+                            ? `Claim ${ubiInfo.claimableAmount} SHR`
+                            : 'No UBI Available'}
+                        </Text>
+                      </>
+                    )}
+                  </LinearGradient>
+                </Pressable>
+
+                {/* Timing Info */}
+                <View style={styles.claimTiming}>
+                  <View style={styles.timingItem}>
+                    <Text style={styles.timingLabel}>Last Claim</Text>
+                    <Text style={styles.timingValue}>{formatDate(ubiInfo.lastClaimTime)}</Text>
+                  </View>
+                  <View style={styles.timingDivider} />
+                  <View style={styles.timingItem}>
+                    <Text style={styles.timingLabel}>Next Claim</Text>
+                    <Text style={[styles.timingValue, { color: colors.success.base }]}>
+                      {getTimeUntilNextClaim() || 'Register identity'}
+                    </Text>
+                  </View>
+                </View>
+              </GlassCard>
+            </Animated.View>
+          )}
+
+          {/* Statistics Card */}
+          <GlassCard style={styles.statsCard} intensity="light">
+            <Text style={styles.sectionTitle}>Your UBI Statistics</Text>
+            
+            <View style={styles.statsGrid}>
+              <View style={styles.statItem}>
+                <LinearGradient
+                  colors={['rgba(139, 92, 246, 0.1)', 'rgba(139, 92, 246, 0.05)']}
+                  style={StyleSheet.absoluteFill}
+                />
+                <Text style={styles.statIcon}>💰</Text>
+                <Text style={styles.statValue}>{ubiInfo?.totalClaimed || '0'}</Text>
+                <Text style={styles.statLabel}>Total Claimed (SHR)</Text>
+              </View>
+              <View style={styles.statItem}>
+                <LinearGradient
+                  colors={['rgba(6, 182, 212, 0.1)', 'rgba(6, 182, 212, 0.05)']}
+                  style={StyleSheet.absoluteFill}
+                />
+                <Text style={styles.statIcon}>📊</Text>
+                <Text style={styles.statValue}>
+                  {ubiInfo?.claimHistory?.length || 0}
+                </Text>
+                <Text style={styles.statLabel}>Claims Made</Text>
+              </View>
             </View>
-          ))}
-        </View>
-      )}
+          </GlassCard>
 
-      {/* How UBI Works */}
-      <View style={styles.infoCard}>
-        <Text style={styles.sectionTitle}>How SHURIUM UBI Works</Text>
-        
-        <View style={styles.infoItem}>
-          <Text style={styles.infoNumber}>1</Text>
-          <View style={styles.infoContent}>
-            <Text style={styles.infoTitle}>Register Your Identity</Text>
-            <Text style={styles.infoDescription}>
-              Create a privacy-preserving identity using zero-knowledge proofs. 
-              Your personal data never leaves your device.
-            </Text>
-          </View>
-        </View>
+          {/* Claim History */}
+          {ubiInfo?.claimHistory && ubiInfo.claimHistory.length > 0 && (
+            <GlassCard style={styles.historyCard} intensity="light">
+              <Text style={styles.sectionTitle}>Claim History</Text>
+              
+              {ubiInfo.claimHistory.slice(0, 5).map((claim, index) => (
+                <View key={index} style={styles.historyItem}>
+                  <View style={styles.historyIcon}>
+                    <LinearGradient
+                      colors={gradients.success}
+                      style={styles.historyIconGradient}
+                    >
+                      <Text style={styles.historyIconText}>✓</Text>
+                    </LinearGradient>
+                  </View>
+                  <View style={styles.historyInfo}>
+                    <Text style={styles.historyAmount}>+{claim.amount} SHR</Text>
+                    <Text style={styles.historyDate}>
+                      {new Date(claim.timestamp * 1000).toLocaleDateString()}
+                    </Text>
+                  </View>
+                  <Text style={styles.historyTxid}>
+                    {claim.txid.substring(0, 8)}...
+                  </Text>
+                </View>
+              ))}
+            </GlassCard>
+          )}
 
-        <View style={styles.infoItem}>
-          <Text style={styles.infoNumber}>2</Text>
-          <View style={styles.infoContent}>
-            <Text style={styles.infoTitle}>Get Verified</Text>
-            <Text style={styles.infoDescription}>
-              Higher verification levels unlock higher UBI rates. 
-              Verification protects against Sybil attacks.
-            </Text>
-          </View>
-        </View>
+          {/* How UBI Works */}
+          <GlassCard style={styles.infoCard} intensity="light">
+            <Text style={styles.sectionTitle}>How SHURIUM UBI Works</Text>
+            
+            {[
+              { num: '1', title: 'Register Your Identity', desc: 'Create a privacy-preserving identity using zero-knowledge proofs.', icon: '🔐' },
+              { num: '2', title: 'Get Verified', desc: 'Higher verification levels unlock higher UBI rates.', icon: '✅' },
+              { num: '3', title: 'Claim Regularly', desc: 'UBI accrues over time. Claim whenever you need it.', icon: '⏰' },
+              { num: '4', title: 'Use or Stake', desc: 'Spend, save, or stake your UBI to earn more.', icon: '💎' },
+            ].map((step, index) => (
+              <View key={index} style={styles.infoItem}>
+                <LinearGradient
+                  colors={gradients.primary}
+                  style={styles.infoNumber}
+                >
+                  <Text style={styles.infoNumberText}>{step.num}</Text>
+                </LinearGradient>
+                <View style={styles.infoContent}>
+                  <View style={styles.infoTitleRow}>
+                    <Text style={styles.infoTitle}>{step.title}</Text>
+                    <Text style={styles.infoIcon}>{step.icon}</Text>
+                  </View>
+                  <Text style={styles.infoDescription}>{step.desc}</Text>
+                </View>
+              </View>
+            ))}
+          </GlassCard>
 
-        <View style={styles.infoItem}>
-          <Text style={styles.infoNumber}>3</Text>
-          <View style={styles.infoContent}>
-            <Text style={styles.infoTitle}>Claim Regularly</Text>
-            <Text style={styles.infoDescription}>
-              UBI accrues over time. Claim daily, weekly, or whenever 
-              you need it. Unclaimed UBI remains available.
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.infoItem}>
-          <Text style={styles.infoNumber}>4</Text>
-          <View style={styles.infoContent}>
-            <Text style={styles.infoTitle}>Use or Stake</Text>
-            <Text style={styles.infoDescription}>
-              Spend your UBI, save it, or stake it to earn additional rewards. 
-              It's your money - use it as you wish.
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Verification Levels Info */}
-      <View style={styles.levelsCard}>
-        <Text style={styles.sectionTitle}>Verification Levels</Text>
-        
-        {Object.entries(VERIFICATION_LEVELS).filter(([key]) => key !== 'none').map(([key, level]) => (
-          <View key={key} style={styles.levelItem}>
-            <View style={[styles.levelDot, { backgroundColor: level.color }]} />
-            <View style={styles.levelInfo}>
-              <Text style={styles.levelName}>{level.label}</Text>
-              <Text style={styles.levelDescription}>{level.description}</Text>
-            </View>
-          </View>
-        ))}
-      </View>
-    </ScrollView>
+          {/* Verification Levels */}
+          <GlassCard style={styles.levelsCard} intensity="light">
+            <Text style={styles.sectionTitle}>Verification Levels</Text>
+            
+            {Object.entries(VERIFICATION_LEVELS).filter(([key]) => key !== 'none').map(([key, level]) => (
+              <View key={key} style={styles.levelItem}>
+                <LinearGradient
+                  colors={level.gradient}
+                  style={styles.levelDot}
+                />
+                <View style={styles.levelInfo}>
+                  <View style={styles.levelHeader}>
+                    <Text style={styles.levelIcon}>{level.icon}</Text>
+                    <Text style={[styles.levelName, { color: level.color }]}>{level.label}</Text>
+                  </View>
+                  <Text style={styles.levelDescription}>{level.description}</Text>
+                </View>
+              </View>
+            ))}
+          </GlassCard>
+        </Animated.View>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: colors.background.primary,
+  },
+  backgroundOrbs: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+  },
+  orb: {
+    position: 'absolute',
+    borderRadius: 9999,
+  },
+  orb1: {
+    width: 400,
+    height: 400,
+    top: -150,
+    left: -150,
+    backgroundColor: 'rgba(168, 85, 247, 0.12)',
+  },
+  orb2: {
+    width: 300,
+    height: 300,
+    top: 200,
+    right: -100,
+    backgroundColor: 'rgba(139, 92, 246, 0.08)',
+  },
+  orb3: {
+    width: 200,
+    height: 200,
+    bottom: 100,
+    left: -50,
+    backgroundColor: 'rgba(16, 185, 129, 0.06)',
+  },
+  scrollView: {
+    flex: 1,
+    padding: spacing.md,
   },
   errorBanner: {
-    backgroundColor: '#F44336',
-    padding: 12,
+    padding: spacing.md,
+    borderRadius: radius.md,
     alignItems: 'center',
+    overflow: 'hidden',
+    marginBottom: spacing.md,
   },
   errorText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: typography.caption.fontSize,
+    fontWeight: '600',
   },
-  headerCard: {
-    backgroundColor: '#9C27B0',
-    padding: 20,
-    margin: 16,
-    marginBottom: 0,
-    borderRadius: 16,
+  heroCard: {
+    padding: spacing.lg,
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    overflow: 'hidden',
   },
-  headerTitle: {
-    color: '#fff',
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 8,
+  heroIcon: {
+    fontSize: 48,
+    marginBottom: spacing.sm,
   },
-  headerDescription: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 14,
-    lineHeight: 20,
+  heroTitle: {
+    color: colors.text.primary,
+    fontSize: typography.h2.fontSize,
+    fontWeight: '700',
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  heroDescription: {
+    color: colors.text.secondary,
+    fontSize: typography.body.fontSize,
+    textAlign: 'center',
+    lineHeight: 22,
   },
   sectionTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 16,
+    color: colors.text.primary,
+    fontSize: typography.bodyBold.fontSize,
+    fontWeight: '600',
+    marginBottom: spacing.md,
   },
   identityCard: {
-    backgroundColor: '#1E1E1E',
-    padding: 20,
-    margin: 16,
-    borderRadius: 16,
+    padding: spacing.md,
+    marginBottom: spacing.md,
   },
-  identityStatus: {
+  identityHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: spacing.xs,
   },
   verificationBadge: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+  },
+  verificationIcon: {
+    fontSize: 14,
+    marginRight: spacing.xs,
   },
   verificationText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 12,
+    fontWeight: '700',
   },
   verificationDescription: {
-    color: '#888',
-    fontSize: 14,
+    color: colors.text.tertiary,
+    fontSize: typography.caption.fontSize,
+    marginBottom: spacing.md,
   },
   identityDetails: {
     borderTopWidth: 1,
-    borderTopColor: '#333',
-    paddingTop: 16,
+    borderTopColor: colors.glass.borderLight,
+    paddingTop: spacing.md,
   },
   identityRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
   },
   identityLabel: {
-    color: '#888',
-    fontSize: 14,
+    color: colors.text.tertiary,
+    fontSize: typography.body.fontSize,
   },
   identityValue: {
-    color: '#fff',
-    fontSize: 14,
-    flex: 1,
-    textAlign: 'right',
-    marginLeft: 16,
+    color: colors.text.primary,
+    fontSize: typography.body.fontSize,
+    fontWeight: '500',
+  },
+  statusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: spacing.xs,
   },
   notRegistered: {
     alignItems: 'center',
-    paddingTop: 16,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.glass.borderLight,
   },
   notRegisteredText: {
-    color: '#888',
-    fontSize: 14,
+    color: colors.text.tertiary,
+    fontSize: typography.body.fontSize,
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   registerButton: {
-    backgroundColor: '#9C27B0',
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+    marginBottom: spacing.sm,
+    ...shadows.button,
+    shadowColor: '#A855F7',
+  },
+  registerIcon: {
+    fontSize: 18,
+    marginRight: spacing.sm,
   },
   registerButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: typography.body.fontSize,
+    fontWeight: '700',
   },
   registerHint: {
-    color: '#666',
-    fontSize: 12,
+    color: colors.text.muted,
+    fontSize: typography.small.fontSize,
     textAlign: 'center',
   },
   claimCard: {
-    backgroundColor: '#1E1E1E',
-    padding: 20,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 16,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    overflow: 'hidden',
   },
-  claimAmount: {
+  claimAmountContainer: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: spacing.md,
   },
   claimAmountLabel: {
-    color: '#888',
-    fontSize: 14,
-    marginBottom: 4,
+    color: colors.text.tertiary,
+    fontSize: typography.caption.fontSize,
+    marginBottom: spacing.xs,
+  },
+  claimAmountRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
   },
   claimAmountValue: {
-    color: '#4CAF50',
-    fontSize: 36,
-    fontWeight: 'bold',
+    color: colors.success.base,
+    fontSize: 42,
+    fontWeight: '800',
+  },
+  claimAmountCurrency: {
+    color: colors.success.base,
+    fontSize: typography.h3.fontSize,
+    fontWeight: '600',
+    marginLeft: spacing.sm,
+    opacity: 0.7,
   },
   claimButton: {
-    backgroundColor: '#9C27B0',
-    padding: 18,
-    borderRadius: 12,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    justifyContent: 'center',
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    marginBottom: spacing.md,
+    ...shadows.button,
+    shadowColor: colors.success.base,
   },
   claimButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.6,
+    shadowOpacity: 0,
+  },
+  claimButtonIcon: {
+    fontSize: 20,
+    marginRight: spacing.sm,
   },
   claimButtonText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: typography.bodyBold.fontSize,
+    fontWeight: '700',
   },
   claimTiming: {
-    borderTopWidth: 1,
-    borderTopColor: '#333',
-    paddingTop: 16,
-  },
-  timingRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
+    borderTopWidth: 1,
+    borderTopColor: colors.glass.borderLight,
+    paddingTop: spacing.md,
+  },
+  timingItem: {
+    flex: 1,
+    alignItems: 'center',
   },
   timingLabel: {
-    color: '#888',
-    fontSize: 14,
+    color: colors.text.muted,
+    fontSize: typography.small.fontSize,
+    marginBottom: spacing.xs,
   },
   timingValue: {
-    color: '#fff',
-    fontSize: 14,
+    color: colors.text.primary,
+    fontSize: typography.body.fontSize,
+    fontWeight: '500',
+  },
+  timingDivider: {
+    width: 1,
+    backgroundColor: colors.glass.borderLight,
   },
   statsCard: {
-    backgroundColor: '#1E1E1E',
-    padding: 20,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 16,
+    padding: spacing.md,
+    marginBottom: spacing.md,
   },
   statsGrid: {
     flexDirection: 'row',
-    gap: 16,
+    gap: spacing.md,
   },
   statItem: {
     flex: 1,
-    backgroundColor: '#2A2A2A',
-    padding: 16,
-    borderRadius: 12,
+    padding: spacing.md,
+    borderRadius: radius.lg,
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  statIcon: {
+    fontSize: 24,
+    marginBottom: spacing.xs,
   },
   statValue: {
-    color: '#fff',
+    color: colors.text.primary,
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   statLabel: {
-    color: '#888',
-    fontSize: 12,
-    marginTop: 4,
+    color: colors.text.tertiary,
+    fontSize: typography.small.fontSize,
     textAlign: 'center',
+    marginTop: spacing.xs,
   },
   historyCard: {
-    backgroundColor: '#1E1E1E',
-    padding: 20,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 16,
+    padding: spacing.md,
+    marginBottom: spacing.md,
   },
   historyItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    borderBottomColor: colors.glass.borderLight,
+  },
+  historyIcon: {
+    marginRight: spacing.md,
+  },
+  historyIconGradient: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  historyIconText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
   },
   historyInfo: {
     flex: 1,
   },
   historyAmount: {
-    color: '#4CAF50',
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: colors.success.base,
+    fontSize: typography.body.fontSize,
+    fontWeight: '600',
   },
   historyDate: {
-    color: '#888',
-    fontSize: 12,
+    color: colors.text.muted,
+    fontSize: typography.small.fontSize,
   },
   historyTxid: {
-    color: '#666',
-    fontSize: 12,
+    color: colors.text.muted,
+    fontSize: typography.small.fontSize,
     fontFamily: 'monospace',
   },
   infoCard: {
-    backgroundColor: '#1E1E1E',
-    padding: 20,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 16,
+    padding: spacing.md,
+    marginBottom: spacing.md,
   },
   infoItem: {
     flexDirection: 'row',
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   infoNumber: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#9C27B0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  infoNumberText: {
     color: '#fff',
     fontSize: 14,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    lineHeight: 28,
-    marginRight: 12,
-    overflow: 'hidden',
+    fontWeight: '700',
   },
   infoContent: {
     flex: 1,
   },
+  infoTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
   infoTitle: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 4,
+    color: colors.text.primary,
+    fontSize: typography.body.fontSize,
+    fontWeight: '600',
+  },
+  infoIcon: {
+    fontSize: 16,
   },
   infoDescription: {
-    color: '#888',
-    fontSize: 13,
+    color: colors.text.tertiary,
+    fontSize: typography.caption.fontSize,
     lineHeight: 18,
   },
   levelsCard: {
-    backgroundColor: '#1E1E1E',
-    padding: 20,
-    marginHorizontal: 16,
-    marginBottom: 32,
-    borderRadius: 16,
+    padding: spacing.md,
+    marginBottom: spacing.xxl,
   },
   levelItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    borderBottomColor: colors.glass.borderLight,
   },
   levelDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    marginRight: 12,
+    marginRight: spacing.md,
   },
   levelInfo: {
     flex: 1,
   },
-  levelName: {
-    color: '#fff',
+  levelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  levelIcon: {
     fontSize: 14,
-    fontWeight: '500',
+    marginRight: spacing.xs,
+  },
+  levelName: {
+    fontSize: typography.body.fontSize,
+    fontWeight: '600',
   },
   levelDescription: {
-    color: '#888',
-    fontSize: 12,
+    color: colors.text.tertiary,
+    fontSize: typography.small.fontSize,
+    marginTop: 2,
   },
 });
 

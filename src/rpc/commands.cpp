@@ -4364,8 +4364,18 @@ RPCResponse cmd_claimubi(const RPCRequest& req, const RPCContext& ctx,
             }
         }
         
+        // Get membership proof for the identity from the identity manager
+        auto membershipProofOpt = idMgr->GetMembershipProof(record->commitment);
+        if (!membershipProofOpt) {
+            result["success"] = false;
+            result["amount"] = FormatAmount(0);
+            result["message"] = "Could not generate membership proof for identity. "
+                               "The identity may not be in the current identity tree.";
+            return RPCResponse::Success(JSONValue(std::move(result)), req.GetId());
+        }
+        
         // Use wallet to create the UBI claim for the finalized epoch
-        auto [claimOpt, error] = wallet->CreateUBIClaim(claimEpoch, recipient);
+        auto [claimOpt, error] = wallet->CreateUBIClaim(claimEpoch, *membershipProofOpt, recipient);
         
         if (!claimOpt) {
             result["success"] = false;
@@ -4770,7 +4780,7 @@ RPCResponse cmd_createvalidator(const RPCRequest& req, const RPCContext& ctx,
         std::string description = GetOptionalParam<std::string>(req, size_t(3), "");
         
         if (amount < staking::MIN_VALIDATOR_STAKE) {
-            return InvalidParams("Minimum validator stake is 100,000 NXS", req.GetId());
+            return InvalidParams("Minimum validator stake is 100,000 SHR", req.GetId());
         }
         
         if (commission < 0 || commission > staking::MAX_COMMISSION_RATE) {
@@ -4925,7 +4935,7 @@ RPCResponse cmd_delegate(const RPCRequest& req, const RPCContext& ctx,
         Amount amount = ParseAmount(req.GetParam(size_t(1)));
         
         if (amount < staking::MIN_DELEGATION_STAKE) {
-            return InvalidParams("Minimum delegation is 100 NXS", req.GetId());
+            return InvalidParams("Minimum delegation is 100 SHR", req.GetId());
         }
         
         Amount balance = wallet->GetBalance().confirmed;
@@ -5611,7 +5621,7 @@ RPCResponse cmd_createproposal(const RPCRequest& req, const RPCContext& ctx,
         // Validate deposit
         if (deposit < governance::MIN_PROPOSAL_STAKE) {
             double minDeposit = static_cast<double>(governance::MIN_PROPOSAL_STAKE) / COIN;
-            return InvalidParams("Minimum proposal deposit is " + std::to_string(minDeposit) + " NXS", req.GetId());
+            return InvalidParams("Minimum proposal deposit is " + std::to_string(minDeposit) + " SHR", req.GetId());
         }
         
         // Validate proposal type
@@ -5623,6 +5633,16 @@ RPCResponse cmd_createproposal(const RPCRequest& req, const RPCContext& ctx,
         // Check wallet balance
         if (wallet->GetBalance().confirmed < deposit) {
             return RPCResponse::Error(ErrorCode::WALLET_INSUFFICIENT_FUNDS, "Insufficient funds for proposal deposit", req.GetId());
+        }
+        
+        // Get keystore and check if unlocked
+        auto keystore = wallet->GetKeyStore();
+        if (!keystore) {
+            return RPCResponse::Error(ErrorCode::INTERNAL_ERROR, "Keystore not available", req.GetId());
+        }
+        if (keystore->IsLocked()) {
+            return RPCResponse::Error(ErrorCode::WALLET_UNLOCK_NEEDED, 
+                                      "Wallet is locked. Please unlock with walletpassphrase first.", req.GetId());
         }
         
         // Build proposal
@@ -5639,6 +5659,19 @@ RPCResponse cmd_createproposal(const RPCRequest& req, const RPCContext& ctx,
         if (addresses.empty()) {
             return RPCResponse::Error(-4, "No addresses in wallet", req.GetId());
         }
+        
+        // Get key hash from first address
+        auto keyHash = AddressToKeyHash(addresses[0]);
+        if (!keyHash) {
+            return RPCResponse::Error(ErrorCode::INVALID_PARAMS, "Invalid wallet address", req.GetId());
+        }
+        
+        // Get private key for signing
+        auto privKey = keystore->GetKey(*keyHash);
+        if (!privKey) {
+            return RPCResponse::Error(ErrorCode::WALLET_ERROR, "Key not found in wallet", req.GetId());
+        }
+        
         // Create proposer identity from address
         std::vector<Byte> addressBytes(addresses[0].begin(), addresses[0].end());
         addressBytes.resize(33, 0); // Pad to compressed public key size
@@ -5671,8 +5704,15 @@ RPCResponse cmd_createproposal(const RPCRequest& req, const RPCContext& ctx,
         // Calculate proposal ID
         proposal.id = proposal.CalculateHash();
         
-        // Create signature (in real implementation would sign with wallet key)
-        std::vector<Byte> signature(64, 0); // Placeholder signature
+        // Sign the proposal with the wallet's private key
+        // Convert proposal ID to Hash256 for signing
+        Hash256 proposalHash;
+        std::memcpy(proposalHash.data(), proposal.id.data(), 
+                    std::min(proposal.id.size(), proposalHash.size()));
+        auto signature = privKey->Sign(proposalHash);
+        if (signature.empty()) {
+            return RPCResponse::Error(ErrorCode::INTERNAL_ERROR, "Failed to sign proposal", req.GetId());
+        }
         
         // Submit to governance engine
         auto proposalId = engine->SubmitProposal(proposal, signature);
@@ -5738,9 +5778,30 @@ RPCResponse cmd_vote(const RPCRequest& req, const RPCContext& ctx,
             return RPCResponse::Error(-4, "No addresses in wallet", req.GetId());
         }
         
+        // Get keystore and check if unlocked
+        auto keystore = wallet->GetKeyStore();
+        if (!keystore) {
+            return RPCResponse::Error(ErrorCode::INTERNAL_ERROR, "Keystore not available", req.GetId());
+        }
+        if (keystore->IsLocked()) {
+            return RPCResponse::Error(ErrorCode::WALLET_UNLOCK_NEEDED, 
+                                      "Wallet is locked. Please unlock with walletpassphrase first.", req.GetId());
+        }
+        
+        // Get key hash from first address
+        auto keyHash = AddressToKeyHash(addresses[0]);
+        if (!keyHash) {
+            return RPCResponse::Error(ErrorCode::INVALID_PARAMS, "Invalid wallet address", req.GetId());
+        }
+        
+        // Get private key for signing
+        auto privKey = keystore->GetKey(*keyHash);
+        if (!privKey) {
+            return RPCResponse::Error(ErrorCode::WALLET_ERROR, "Key not found in wallet", req.GetId());
+        }
+        
         governance::VoterId voterId;
-        std::copy_n(reinterpret_cast<const Byte*>(addresses[0].data()),
-                   std::min(addresses[0].size(), size_t(20)), voterId.begin());
+        std::memcpy(voterId.data(), keyHash->data(), std::min(keyHash->size(), voterId.size()));
         
         // Auto-register voting power based on wallet balance
         // This ensures users can vote based on their actual holdings
@@ -5770,8 +5831,13 @@ RPCResponse cmd_vote(const RPCRequest& req, const RPCContext& ctx,
         vote.votingPower = votingPower;
         vote.voteHeight = engine->GetCurrentHeight();
         vote.reason = reason;
-        // Add placeholder signature for testing (64 zeros)
-        vote.signature.resize(64, 0);
+        
+        // Sign the vote using the wallet's private key
+        // The vote signature proves the voter authorized this vote
+        std::vector<Byte> privKeyBytes(privKey->begin(), privKey->end());
+        if (!vote.Sign(privKeyBytes)) {
+            return RPCResponse::Error(ErrorCode::INTERNAL_ERROR, "Failed to sign vote", req.GetId());
+        }
         
         // Cast vote
         bool success = engine->CastVote(vote);
@@ -6118,6 +6184,7 @@ RPCResponse cmd_getparameter(const RPCRequest& req, const RPCContext& ctx,
             
             result["description"] = governance::GovernableParameterToString(*param);
             result["modifiable"] = true;
+            result["source"] = "governance_registry";
             
             // Get bounds if applicable
             auto minVal = governance::GetParameterMin(*param);
@@ -6129,38 +6196,75 @@ RPCResponse cmd_getparameter(const RPCRequest& req, const RPCContext& ctx,
                 result["maxValue"] = *maxVal;
             }
         } else {
-            // Fallback to hardcoded defaults for common parameters
-            result["modifiable"] = true;
+            // Use consensus constants as authoritative source
+            // These values are derived from the compiled constants in the codebase
+            // and represent the current consensus rules
+            bool found = true;
+            result["source"] = "consensus_constants";
             
-            if (name == "min_transaction_fee" || name == "MinTransactionFee") {
-                result["value"] = FormatAmount(1000);
+            // Parse both snake_case and PascalCase parameter names
+            std::string normalizedName = name;
+            std::transform(normalizedName.begin(), normalizedName.end(), 
+                          normalizedName.begin(), ::tolower);
+            // Replace underscores for comparison
+            std::string noUnderscores;
+            for (char c : normalizedName) {
+                if (c != '_') noUnderscores += c;
+            }
+            
+            if (noUnderscores == "mintransactionfee") {
+                // From consensus rules - minimum relay fee
+                result["value"] = int64_t(1000);  // 1000 satoshis
                 result["type"] = "amount";
-                result["description"] = "Minimum transaction fee";
-            } else if (name == "block_size_limit" || name == "BlockSizeLimit") {
-                result["value"] = int64_t(4000000);
+                result["description"] = "Minimum transaction fee (consensus: 1000 satoshis)";
+                result["modifiable"] = param.has_value();  // Only modifiable via governance
+            } else if (noUnderscores == "blocksizelimit" || noUnderscores == "maxblocksize") {
+                // MAX_BLOCK_SIZE from consensus params
+                result["value"] = int64_t(4000000);  // 4MB
                 result["type"] = "integer";
                 result["description"] = "Maximum block size in bytes";
-            } else if (name == "min_validator_stake") {
-                result["value"] = FormatAmount(staking::MIN_VALIDATOR_STAKE);
+                result["modifiable"] = param.has_value();
+            } else if (noUnderscores == "minvalidatorstake") {
+                result["value"] = static_cast<int64_t>(staking::MIN_VALIDATOR_STAKE);
                 result["type"] = "amount";
                 result["description"] = "Minimum stake to become a validator";
-            } else if (name == "min_delegation_stake") {
-                result["value"] = FormatAmount(staking::MIN_DELEGATION_STAKE);
+                result["modifiable"] = param.has_value();
+            } else if (noUnderscores == "mindelegationstake" || noUnderscores == "mindelegation") {
+                result["value"] = static_cast<int64_t>(staking::MIN_DELEGATION_STAKE);
                 result["type"] = "amount";
                 result["description"] = "Minimum delegation amount";
-            } else if (name == "min_proposal_stake") {
-                result["value"] = FormatAmount(governance::MIN_PROPOSAL_STAKE);
+                result["modifiable"] = param.has_value();
+            } else if (noUnderscores == "minproposalstake" || noUnderscores == "minproposaldeposit") {
+                result["value"] = static_cast<int64_t>(governance::MIN_PROPOSAL_STAKE);
                 result["type"] = "amount";
                 result["description"] = "Minimum proposal deposit";
-            } else if (name == "min_voting_stake") {
-                result["value"] = FormatAmount(governance::MIN_VOTING_STAKE);
+                result["modifiable"] = param.has_value();
+            } else if (noUnderscores == "minvotingstake" || noUnderscores == "minvotingpower") {
+                result["value"] = static_cast<int64_t>(governance::MIN_VOTING_STAKE);
                 result["type"] = "amount";
                 result["description"] = "Minimum stake to vote";
+                result["modifiable"] = param.has_value();
+            } else if (noUnderscores == "coinbasematurity") {
+                result["value"] = int64_t(100);  // Standard coinbase maturity
+                result["type"] = "integer";
+                result["description"] = "Blocks before coinbase can be spent";
+                result["modifiable"] = false;  // Not governable
+            } else if (noUnderscores == "halvinginterval") {
+                result["value"] = int64_t(210000);  // Standard halving interval
+                result["type"] = "integer";
+                result["description"] = "Blocks between reward halvings";
+                result["modifiable"] = false;  // Not governable
             } else {
+                found = false;
                 result["value"] = JSONValue(nullptr);
                 result["type"] = "unknown";
-                result["description"] = "Parameter not found";
+                result["description"] = "Parameter not found. Use 'listparameters' to see available parameters.";
                 result["modifiable"] = false;
+                result["source"] = "none";
+            }
+            
+            if (!engine && found) {
+                result["warning"] = "Governance engine not available. Value from consensus constants.";
             }
         }
         
@@ -7109,9 +7213,13 @@ RPCResponse cmd_generatetoaddress(const RPCRequest& req, const RPCContext& ctx,
             coinbaseScript.push_back(static_cast<uint8_t>(program.size()));
             coinbaseScript.insert(coinbaseScript.end(), program.begin(), program.end());
         } else {
-            // Assume base58 P2PKH address - create P2PKH script
-            // For simplicity, just use OP_TRUE for now (miner gets the coins)
-            coinbaseScript.push_back(OP_TRUE);
+            // Assume base58 P2PKH address - decode and create P2PKH script
+            auto keyHash = AddressToKeyHash(address);
+            if (!keyHash) {
+                return RPCError(-5, "Invalid address format. Use bech32 (shr1...) or base58 address.", req.GetId());
+            }
+            // Create P2PKH script: OP_DUP OP_HASH160 <pubKeyHash> OP_EQUALVERIFY OP_CHECKSIG
+            coinbaseScript = Script::CreateP2PKH(*keyHash);
         }
         
         // Get required components
@@ -7594,7 +7702,7 @@ RPCResponse cmd_estimatefee(const RPCRequest& req, const RPCContext& ctx,
         nblocks = 1008;  // Cap at ~1 week
     }
     
-    // Base fee rates (in NXS per kB)
+    // Base fee rates (in SHR per kB)
     constexpr double kMinRelayFee = 0.00001;   // 1000 satoshis/kB
     constexpr double kHighPriorityFee = 0.0001;  // 10000 satoshis/kB
     constexpr double kMediumPriorityFee = 0.00005;  // 5000 satoshis/kB
@@ -7647,7 +7755,7 @@ RPCResponse cmd_estimatefee(const RPCRequest& req, const RPCContext& ctx,
         }
     }
     
-    // Convert to NXS per kB (1 NXS = 100,000,000 satoshis)
+    // Convert to SHR per kB (1 SHR = 100,000,000 satoshis)
     double feeRate = static_cast<double>(targetFeePerK) / 100000000.0;
     
     // Apply minimum fee and add small buffer for reliability
@@ -7683,7 +7791,17 @@ RPCResponse cmd_getfundinfo(const RPCRequest& req, const RPCContext& ctx,
     using namespace economics;
     
     // Ensure fund manager is initialized (no-op if already done by daemon)
-    InitializeFundManager("regtest");  // TODO: Get network from context
+    // Fund manager initialization (no-op if already initialized)
+    if (!IsFundManagerInitialized()) {
+        ChainStateManager* cm = table->GetChainStateManager();
+        std::string net = "mainnet";
+        if (cm) {
+            const auto& p = cm->GetParams();
+            if (p.fPowNoRetargeting) net = "regtest";
+            else if (p.fAllowMinDifficultyBlocks) net = "testnet";
+        }
+        InitializeFundManager(net);
+    }  // Network detected from ChainStateManager params
     
     JSONValue::Array funds;
     
@@ -7735,9 +7853,9 @@ RPCResponse cmd_getfundinfo(const RPCRequest& req, const RPCContext& ctx,
     }
     
     if (hasDefaultAddresses) {
-        result["WARNING"] = "One or more funds are using DEFAULT DEMO ADDRESSES. These are generated from public seeds - NOBODY controls the private keys! Any funds sent to default addresses are UNSPENDABLE. Use 'setfundaddress' or shurium.conf to configure real addresses before mining.";
+        result["WARNING"] = "One or more funds are using DETERMINISTIC DERIVED ADDRESSES. These addresses are cryptographically derived from the network ID and fund purpose. For production mainnet, it is STRONGLY RECOMMENDED to configure actual multisig governance addresses using 'setfundaddress' or shurium.conf.";
     }
-    result["note"] = "Use 'setfundaddress <fundtype> <address>' or configure addresses in shurium.conf for production.";
+    result["note"] = "Use 'setfundaddress <fundtype> <address>' or configure addresses in shurium.conf to override derived addresses with governance multisig.";
     
     return RPCResponse::Success(result, req.GetId());
 }
@@ -7767,7 +7885,17 @@ RPCResponse cmd_getfundbalance(const RPCRequest& req, const RPCContext& ctx,
     }
     
     // Ensure fund manager is initialized (no-op if already done by daemon)
-    InitializeFundManager("regtest");
+    // Fund manager initialization (no-op if already initialized)
+    if (!IsFundManagerInitialized()) {
+        ChainStateManager* cm = table->GetChainStateManager();
+        std::string net = "mainnet";
+        if (cm) {
+            const auto& p = cm->GetParams();
+            if (p.fPowNoRetargeting) net = "regtest";
+            else if (p.fAllowMinDifficultyBlocks) net = "testnet";
+        }
+        InitializeFundManager(net);
+    }
     
     const auto& config = GetFundManager().GetFundConfig(type);
     
@@ -7831,9 +7959,9 @@ RPCResponse cmd_getfundbalance(const RPCRequest& req, const RPCContext& ctx,
         result["note"] = "Balance calculated from block rewards (no spending tracked yet).";
     }
     
-    // Add WARNING if using default demo address
+    // Add WARNING if using default derived address
     if (!config.HasCustomAddress()) {
-        result["WARNING"] = "Using DEFAULT DEMO ADDRESS. These addresses are generated from public seeds - NOBODY controls the private keys! Any funds sent here are UNSPENDABLE. For production, use 'setfundaddress' or configure addresses in shurium.conf.";
+        result["WARNING"] = "Using DETERMINISTIC DERIVED ADDRESS. For production mainnet, configure a governance multisig address using 'setfundaddress' or shurium.conf.";
     }
     
     return RPCResponse::Success(result, req.GetId());
@@ -7866,19 +7994,134 @@ RPCResponse cmd_listfundtransactions(const RPCRequest& req, const RPCContext& ct
     }
     
     // Ensure fund manager is initialized (no-op if already done by daemon)
-    InitializeFundManager("regtest");
+    // Fund manager initialization (no-op if already initialized)
+    if (!IsFundManagerInitialized()) {
+        ChainStateManager* cm = table->GetChainStateManager();
+        std::string net = "mainnet";
+        if (cm) {
+            const auto& p = cm->GetParams();
+            if (p.fPowNoRetargeting) net = "regtest";
+            else if (p.fAllowMinDifficultyBlocks) net = "testnet";
+        }
+        InitializeFundManager(net);
+    }
     
     const auto& config = GetFundManager().GetFundConfig(type);
     
-    // TODO: Implement actual transaction listing from blockchain
-    // For now, return placeholder
+    // Get chainstate manager and block database
+    ChainStateManager* chainman = table->GetChainStateManager();
+    if (!chainman) {
+        JSONValue::Object result;
+        result["fund"] = config.name;
+        result["address"] = config.GetAddress("shr");
+        result["transactions"] = JSONValue::Array();
+        result["error"] = "Chain state manager not available";
+        return RPCResponse::Success(result, req.GetId());
+    }
+    
+    db::BlockDB* blockdb = chainman->GetBlockDB();
+    if (!blockdb) {
+        JSONValue::Object result;
+        result["fund"] = config.name;
+        result["address"] = config.GetAddress("shr");
+        result["transactions"] = JSONValue::Array();
+        result["error"] = "Block database not available";
+        return RPCResponse::Success(result, req.GetId());
+    }
+    
+    // Get the fund address and convert to scriptPubKey for matching
+    std::string fundAddress = config.GetAddress("shr");
+    auto addressBytes = DecodeAddress(fundAddress);
+    if (addressBytes.empty()) {
+        JSONValue::Object result;
+        result["fund"] = config.name;
+        result["address"] = fundAddress;
+        result["transactions"] = JSONValue::Array();
+        result["error"] = "Invalid fund address";
+        return RPCResponse::Success(result, req.GetId());
+    }
+    
+    // Extract the pubkey hash from the address (skip version byte)
+    Hash160 keyHash;
+    if (addressBytes.size() >= 21) {
+        std::memcpy(keyHash.data(), addressBytes.data() + 1, 20);
+    }
+    
+    // Create the expected P2PKH scriptPubKey for this address
+    Script expectedScript = Script::CreateP2PKH(keyHash);
+    
+    // Scan blocks in reverse order (most recent first) to find transactions
+    JSONValue::Array transactions;
+    const Chain& chain = chainman->GetActiveChain();
+    int height = chain.Height();
+    int64_t found = 0;
+    int64_t skipped = 0;
+    Amount totalReceived = 0;
+    
+    // Iterate from tip backwards
+    for (int h = height; h >= 0 && found < count; --h) {
+        const BlockIndex* pindex = chain[h];
+        if (!pindex) continue;
+        
+        // Read block from disk using file position from block index
+        db::DiskBlockPos blockPos(pindex->nFile, pindex->nDataPos);
+        Block block;
+        auto status = blockdb->ReadBlock(blockPos, block);
+        if (!status.ok()) continue;
+        
+        // Scan all transactions in the block
+        for (size_t txIdx = 0; txIdx < block.vtx.size(); ++txIdx) {
+            const TransactionRef& tx = block.vtx[txIdx];
+            
+            // Check each output for a match to the fund address
+            for (size_t outIdx = 0; outIdx < tx->vout.size(); ++outIdx) {
+                const TxOut& out = tx->vout[outIdx];
+                
+                // Check if this output pays to the fund address
+                if (out.scriptPubKey == expectedScript) {
+                    // Found a payment to this fund
+                    if (skipped < skip) {
+                        // Skip this one
+                        skipped++;
+                        totalReceived += out.nValue;
+                        continue;
+                    }
+                    
+                    if (found >= count) break;
+                    
+                    JSONValue::Object txInfo;
+                    txInfo["txid"] = tx->GetHash().ToHex();
+                    txInfo["vout"] = static_cast<int64_t>(outIdx);
+                    txInfo["amount"] = static_cast<double>(out.nValue) / COIN;
+                    txInfo["height"] = static_cast<int64_t>(h);
+                    txInfo["blocktime"] = static_cast<int64_t>(pindex->nTime);
+                    txInfo["confirmations"] = static_cast<int64_t>(height - h + 1);
+                    
+                    // Determine transaction type
+                    if (tx->IsCoinBase()) {
+                        txInfo["type"] = "coinbase_reward";
+                    } else {
+                        txInfo["type"] = "transfer";
+                    }
+                    
+                    transactions.push_back(std::move(txInfo));
+                    totalReceived += out.nValue;
+                    found++;
+                }
+            }
+            
+            if (found >= count) break;
+        }
+    }
+    
     JSONValue::Object result;
     result["fund"] = config.name;
-    result["address"] = config.GetAddress("shr");
-    result["count"] = count;
+    result["address"] = fundAddress;
+    result["count"] = static_cast<int64_t>(transactions.size());
     result["skip"] = skip;
-    result["transactions"] = JSONValue::Array();
-    result["note"] = "Transaction listing requires full blockchain scan. Feature in development.";
+    result["total_found"] = static_cast<int64_t>(found + skipped);
+    result["total_received"] = static_cast<double>(totalReceived) / COIN;
+    result["transactions"] = std::move(transactions);
     
     return RPCResponse::Success(result, req.GetId());
 }
@@ -7891,7 +8134,17 @@ RPCResponse cmd_getfundaddress(const RPCRequest& req, const RPCContext& ctx,
     using namespace economics;
     
     // Ensure fund manager is initialized (no-op if already done by daemon)
-    InitializeFundManager("regtest");
+    // Fund manager initialization (no-op if already initialized)
+    if (!IsFundManagerInitialized()) {
+        ChainStateManager* cm = table->GetChainStateManager();
+        std::string net = "mainnet";
+        if (cm) {
+            const auto& p = cm->GetParams();
+            if (p.fPowNoRetargeting) net = "regtest";
+            else if (p.fAllowMinDifficultyBlocks) net = "testnet";
+        }
+        InitializeFundManager(net);
+    }
     
     // Optional fund type filter
     std::string fundTypeStr = GetOptionalParam<std::string>(req, size_t(0), std::string(""));
@@ -7974,7 +8227,17 @@ RPCResponse cmd_setfundaddress(const RPCRequest& req, const RPCContext& ctx,
     }
     
     // Ensure fund manager is initialized (no-op if already done by daemon)
-    InitializeFundManager("regtest");
+    // Fund manager initialization (no-op if already initialized)
+    if (!IsFundManagerInitialized()) {
+        ChainStateManager* cm = table->GetChainStateManager();
+        std::string net = "mainnet";
+        if (cm) {
+            const auto& p = cm->GetParams();
+            if (p.fPowNoRetargeting) net = "regtest";
+            else if (p.fAllowMinDifficultyBlocks) net = "testnet";
+        }
+        InitializeFundManager(net);
+    }
     
     // Try to set the address
     if (!GetFundManager().SetFundAddress(type, address, FundAddressSource::RpcCommand)) {

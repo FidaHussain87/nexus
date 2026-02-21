@@ -115,14 +115,87 @@ bool Mempool::AddTx(const TransactionRef& tx, Amount fee, uint32_t height,
         return false;
     }
     
-    // Check for conflicts
+    // Check for conflicts and handle RBF (Replace-by-Fee) per BIP 125
+    std::set<TxHash> conflictingTxs;
+    std::set<TxHash> allConflicting;  // Including descendants
+    Amount conflictingFees = 0;
+    
     for (const auto& txin : tx->vin) {
         auto it = mapNextTx.find(txin.prevout);
         if (it != mapNextTx.end()) {
-            // There's a conflict - for now just reject
-            // RBF would check if replacement is valid
-            errString = "txn-mempool-conflict";
+            conflictingTxs.insert(it->second);
+        }
+    }
+    
+    if (!conflictingTxs.empty()) {
+        // BIP 125 Rule 1: All conflicting transactions must signal replaceability
+        // A transaction signals RBF if any input has nSequence < (0xffffffff - 1)
+        for (const TxHash& conflictTxid : conflictingTxs) {
+            auto conflictIt = mapTx.find(conflictTxid);
+            if (conflictIt == mapTx.end()) {
+                continue;
+            }
+            
+            const Transaction& conflictTx = conflictIt->second.GetTx();
+            bool signalsRBF = false;
+            for (const auto& conflictIn : conflictTx.vin) {
+                // Signal RBF if nSequence < MAX_SEQUENCE_NONFINAL (0xfffffffe)
+                if (conflictIn.nSequence < TxIn::MAX_SEQUENCE_NONFINAL) {
+                    signalsRBF = true;
+                    break;
+                }
+            }
+            
+            if (!signalsRBF) {
+                errString = "txn-mempool-conflict";
+                return false;
+            }
+            
+            // Collect this transaction and all its descendants
+            allConflicting.insert(conflictTxid);
+            std::set<TxHash> descendants = GetDescendants(conflictTxid);
+            allConflicting.insert(descendants.begin(), descendants.end());
+        }
+        
+        // BIP 125 Rule 2: Replacement must not add new unconfirmed inputs
+        // (not strictly enforced here - would require checking if new inputs
+        // spend outputs that weren't already spent by conflicting set)
+        
+        // Calculate total fees and size of conflicting transactions
+        for (const TxHash& hash : allConflicting) {
+            auto it = mapTx.find(hash);
+            if (it != mapTx.end()) {
+                conflictingFees += it->second.GetFee();
+            }
+        }
+        
+        // BIP 125 Rule 3: Replacement must pay higher absolute fee
+        if (fee <= conflictingFees) {
+            errString = "insufficient fee for RBF replacement";
             return false;
+        }
+        
+        // BIP 125 Rule 4: Fee increase must pay for new bandwidth
+        // The additional fee must at least cover the incremental relay fee
+        // for the new transaction's size
+        Amount requiredAdditionalFee = limits.incrementalRelayFee.GetFee(tx->GetTotalSize());
+        if (fee < conflictingFees + requiredAdditionalFee) {
+            errString = "insufficient fee for RBF, must pay incremental relay fee";
+            return false;
+        }
+        
+        // BIP 125 Rule 5: Number of original transactions evicted must be <= 100
+        if (allConflicting.size() > 100) {
+            errString = "too many potential replacements";
+            return false;
+        }
+        
+        // All RBF rules passed - remove conflicting transactions
+        for (const TxHash& hash : allConflicting) {
+            auto removeIt = mapTx.find(hash);
+            if (removeIt != mapTx.end()) {
+                RemoveUnchecked(removeIt, MempoolRemovalReason::REPLACED);
+            }
         }
     }
     
@@ -194,9 +267,67 @@ bool Mempool::CheckTx(const TransactionRef& tx, Amount fee, std::string& errStri
         return false;
     }
     
+    // Check for conflicts - if any exist, verify RBF is possible
+    std::set<TxHash> conflictingTxs;
     for (const auto& txin : tx->vin) {
-        if (mapNextTx.find(txin.prevout) != mapNextTx.end()) {
-            errString = "txn-mempool-conflict";
+        auto it = mapNextTx.find(txin.prevout);
+        if (it != mapNextTx.end()) {
+            conflictingTxs.insert(it->second);
+        }
+    }
+    
+    if (!conflictingTxs.empty()) {
+        // Check if all conflicting transactions signal RBF
+        Amount conflictingFees = 0;
+        std::set<TxHash> allConflicting;
+        
+        for (const TxHash& conflictTxid : conflictingTxs) {
+            auto conflictIt = mapTx.find(conflictTxid);
+            if (conflictIt == mapTx.end()) {
+                continue;
+            }
+            
+            const Transaction& conflictTx = conflictIt->second.GetTx();
+            bool signalsRBF = false;
+            for (const auto& conflictIn : conflictTx.vin) {
+                if (conflictIn.nSequence < TxIn::MAX_SEQUENCE_NONFINAL) {
+                    signalsRBF = true;
+                    break;
+                }
+            }
+            
+            if (!signalsRBF) {
+                errString = "txn-mempool-conflict";
+                return false;
+            }
+            
+            allConflicting.insert(conflictTxid);
+            std::set<TxHash> descendants = GetDescendants(conflictTxid);
+            allConflicting.insert(descendants.begin(), descendants.end());
+        }
+        
+        // Calculate conflicting fees
+        for (const TxHash& hash : allConflicting) {
+            auto it = mapTx.find(hash);
+            if (it != mapTx.end()) {
+                conflictingFees += it->second.GetFee();
+            }
+        }
+        
+        // Check fee requirements for RBF
+        if (fee <= conflictingFees) {
+            errString = "insufficient fee for RBF replacement";
+            return false;
+        }
+        
+        Amount requiredAdditionalFee = limits.incrementalRelayFee.GetFee(tx->GetTotalSize());
+        if (fee < conflictingFees + requiredAdditionalFee) {
+            errString = "insufficient fee for RBF, must pay incremental relay fee";
+            return false;
+        }
+        
+        if (allConflicting.size() > 100) {
+            errString = "too many potential replacements";
             return false;
         }
     }
@@ -897,12 +1028,8 @@ MempoolAcceptResult AcceptToMempool(
         }
     }
     
-    // 9. Check for conflicts (double spends)
-    if (mempool.HasConflicts(txRef)) {
-        // For now, reject conflicting transactions
-        // A full implementation would support RBF (Replace By Fee)
-        return MempoolAcceptResult::Invalid("txn-mempool-conflict");
-    }
+    // 9. RBF handling is done in AddTx - no pre-check needed here
+    // The mempool's AddTx will handle conflicts according to BIP 125 RBF rules
     
     // 10. Add to mempool
     std::string errString;

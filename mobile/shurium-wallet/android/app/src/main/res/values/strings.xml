@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SHURIUM Wallet</string>
+    <string name="app_description">The official SHURIUM cryptocurrency wallet with UBI, staking, and identity features</string>
+</resources>

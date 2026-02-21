@@ -126,6 +126,16 @@ struct Params {
     int nMaxIdentityAge;
     
     // ========================================================================
+    // Proof of Useful Work Parameters (SHURIUM-Specific)
+    // ========================================================================
+    
+    /// Block height at which PoUW becomes mandatory (0 = always required)
+    int nPoUWActivationHeight;
+    
+    /// Whether PoUW is optional (for gradual rollout)
+    bool fPoUWOptional;
+    
+    // ========================================================================
     // Helper Methods
     // ========================================================================
     

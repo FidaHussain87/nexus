@@ -309,6 +309,12 @@ public:
     /// Get the underlying ZK proof
     const ZKProof& GetZKProof() const { return zkProof_; }
     
+    /// Get the identity commitment (leaf in Merkle tree)
+    const FieldElement& GetIdentityCommitment() const { return identityCommitment_; }
+    
+    /// Get the Merkle proof for identity membership
+    const VectorCommitment::MerkleProof& GetMerkleProof() const { return merkleProof_; }
+    
     /// Check if proof is valid (structural)
     bool IsValid() const;
     
@@ -322,6 +328,8 @@ private:
     Nullifier nullifier_;
     EpochId epoch_{0};
     ZKProof zkProof_;
+    FieldElement identityCommitment_;  // The leaf in the Merkle tree
+    VectorCommitment::MerkleProof merkleProof_;  // Proof of membership
 };
 
 // ============================================================================

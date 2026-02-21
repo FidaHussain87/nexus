@@ -343,8 +343,8 @@ TEST(SerializeTest, String) {
     std::string str = "Hello, SHURIUM!";
     ds << str;
     
-    // CompactSize(13) = 1 byte + 13 chars = 14 bytes
-    EXPECT_EQ(ds.size(), 14);
+    // CompactSize(15) = 1 byte + 15 chars = 16 bytes
+    EXPECT_EQ(ds.size(), 16);
     
     std::string result;
     ds >> result;
